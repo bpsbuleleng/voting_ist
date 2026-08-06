@@ -78,18 +78,40 @@ button{font-family:inherit; cursor:pointer}
 /* === SECTION: KERANGKA ================================================ */
 header.bar{
   position:sticky; top:0; z-index:20; display:flex; align-items:center;
-  gap:14px; flex-wrap:wrap; padding:10px var(--sisi);
+  gap:14px; padding:10px var(--sisi);
   background:rgba(255,252,243,.95); backdrop-filter:blur(10px);
   border-bottom:1px solid rgba(139,46,32,.14);
 }
-.merek{font:600 10px var(--ui); letter-spacing:.2em; color:var(--bata); white-space:nowrap}
-.tab{display:flex; gap:4px; flex-wrap:wrap; flex:1}
+.merek{font:600 10px var(--ui); letter-spacing:.2em; color:var(--bata); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis}
+/* Baris tab TIDAK dibungkus (flex-wrap) — sederet, digulir mendatar. Mencegah
+   header sticky menjadi setinggi berbaris-baris saat jumlah tab bertambah;
+   overflow-x:auto pada flex item otomatis boleh menyusut di bawah lebar
+   kontennya, jadi header.bar tidak ikut terdorong melebar. */
+.tab{
+  display:flex; gap:4px; flex:1; min-width:0;
+  overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+}
+.tab::-webkit-scrollbar{display:none}
 .tab button{
+  flex:none; white-space:nowrap;
   min-height:38px; padding:0 13px; border:1px solid transparent; border-radius:var(--r-sm);
   background:transparent; color:var(--tinta-lunak); font:500 12.5px var(--ui);
 }
 .tab button:hover{background:rgba(201,162,39,.13)}
 .tab button[aria-selected="true"]{background:var(--bata); color:var(--gading); font-weight:600}
+/* Layar sempit: merek + tab + Segarkan tak lagi muat sebaris. flex-wrap biasa
+   membuat urutannya tak terduga (tab bisa tersisa gang sempit ~68px). Susun
+   jadi grid dua baris TETAP: (merek, Segarkan) lalu tab selebar penuh. */
+@media (max-width:680px){
+  header.bar{
+    display:grid; grid-template-columns:1fr auto; grid-template-areas:"merek segar" "tab tab";
+    row-gap:8px;
+  }
+  .merek{grid-area:merek}
+  #tblSegar{grid-area:segar}
+  .tab{grid-area:tab}
+}
 main{padding:20px var(--sisi) 60px; max-width:1400px; margin:0 auto}
 .panel{display:none}
 .panel.aktif{display:block}
@@ -214,8 +236,9 @@ select{min-width:min(320px,100%)}
     <button role="tab" data-p="kelompok"    aria-selected="false">Per kelompok</button>
     <button role="tab" data-p="indikator"   aria-selected="false">Per indikator</button>
     <button role="tab" data-p="partisipasi" aria-selected="false">Partisipasi</button>
+    <button role="tab" data-p="akhir"       aria-selected="false">Rekap akhir</button>
   </nav>
-  <button class="btn btn-2" id="tblSegar" style="min-height:38px;padding:0 12px;font-size:12px">Segarkan</button>
+  <button class="btn btn-2" id="tblSegar" style="min-height:38px;padding:0 12px;font-size:12px;flex:none">Segarkan</button>
 </header>
 
 <div id="muat"><i></i><span>Menghitung dari sheet vote…</span></div>
@@ -294,6 +317,13 @@ select{min-width:min(320px,100%)}
       <thead><tr><th>Nama</th><th class="kanan">Indikator terisi</th><th>Status</th></tr></thead>
       <tbody id="tbodyPartisipasi"></tbody>
     </table></div>
+  </section>
+
+  <!-- REKAP AKHIR -->
+  <section class="panel" id="p-akhir">
+    <h2 class="judul">Rekap akhir</h2>
+    <p class="sub">Gabungan data administratif sheet "Rekap" (diisi tangan oleh panitia) dengan poin Beauty &amp; Nilai SBO dari voting. Total akhir dihitung ulang dari komponen, bukan dibaca dari sheet.</p>
+    <div id="isiAkhir"></div>
   </section>
 </main>
 
@@ -606,6 +636,59 @@ function gambarPartisipasi(){
   }).join('');
 }
 
+/* === SECTION: REKAP AKHIR === */
+function gambarRekapAkhir(){
+  var RA = D.rekapAkhir;
+  if (!RA || !RA.ok){
+    $('#isiAkhir').innerHTML = '<div class="kosong">' +
+      esc((RA && RA.message) || 'Rekap akhir tidak tersedia.') + '</div>';
+    return;
+  }
+  if (!RA.kandidat.length){
+    $('#isiAkhir').innerHTML = '<div class="kosong">Belum ada baris kandidat di sheet "Rekap".</div>';
+    return;
+  }
+
+  var kepalaBeauty = RA.kolomBeauty.map(function(b){
+    return '<th class="kanan">' + esc(b.indikatorNama) + '</th>';
+  }).join('');
+
+  var baris = RA.kandidat.map(function(k, i){
+    var beautyTd = k.beauty.map(function(v){ return '<td class="kanan num">' + v + '</td>'; }).join('');
+    return '<tr class="' + (i < 3 ? 'atas3' : '') + '">' +
+      '<td class="kanan"><span class="rank-sel num">' + (i + 1) + '</span></td>' +
+      '<td>' + esc(k.pendek) + ' <span style="color:var(--tinta-samar);font-size:11px">' + esc(k.gelar) + '</span></td>' +
+      '<td>' + esc(k.jabatan) + '</td>' +
+      '<td class="kanan num">' + k.masaKerja + '</td>' +
+      '<td class="kanan num">' + k.hukumanDisiplin + '</td>' +
+      '<td class="kanan num">' + k.evaluasiPpk2024 + '</td>' +
+      '<td class="kanan num">' + k.evaluasiPpk2025 + '</td>' +
+      '<td class="kanan num">' + k.istTahapII + '</td>' +
+      '<td class="kanan num">' + k.tingkatPendidikan + '</td>' +
+      '<td class="kanan num">' + k.prestasiEom + '</td>' +
+      '<td class="kanan num">' + k.prestasiJp + '</td>' +
+      '<td class="kanan num"><b>' + k.adminSubtotal + '</b></td>' +
+      beautyTd +
+      '<td class="kanan num">' + k.nilaiSbo + '</td>' +
+      '<td class="kanan num"><b>' + k.totalAkhir + '</b></td>' +
+      '<td class="kanan num" style="color:var(--tinta-samar)">' + k.totalSheet + '</td>' +
+    '</tr>';
+  }).join('');
+
+  $('#isiAkhir').innerHTML =
+    '<div class="bingkai-tabel"><table><thead><tr>' +
+      '<th class="kanan">#</th><th>Nama</th><th>Jabatan</th>' +
+      '<th class="kanan">Masa kerja</th><th class="kanan">Hukuman disiplin</th>' +
+      '<th class="kanan">PPK 2024</th><th class="kanan">PPK 2025</th>' +
+      '<th class="kanan">IST tahap II</th><th class="kanan">Pendidikan</th>' +
+      '<th class="kanan">Prestasi EOM</th><th class="kanan">Prestasi JP</th>' +
+      '<th class="kanan">Subtotal admin</th>' +
+      kepalaBeauty +
+      '<th class="kanan">Nilai SBO</th><th class="kanan">Total akhir</th>' +
+      '<th class="kanan">Total (sheet)</th>' +
+    '</tr></thead><tbody>' + baris + '</tbody></table></div>';
+}
+
 /* === SECTION: MUAT DATA === */
 function ambilData(){
   muat(true);
@@ -619,6 +702,7 @@ function ambilData(){
     isiPilihIndikator(); gambarIndikator();
     gambarPeringkat();
     gambarPartisipasi();
+    gambarRekapAkhir();
   }).catch(function(e){
     muat(false);
     throw e;

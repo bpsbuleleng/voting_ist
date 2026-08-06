@@ -31,7 +31,15 @@ const POIN = { 1: 3, 2: 2, 3: 1 };   // Pilihan 1 / 2 / 3
 const SHEET_PEGAWAI   = 'pegawai';
 const SHEET_INDIKATOR = 'indikator';
 const SHEET_VOTE      = 'vote';
-const SHEET_REKAP     = 'rekap';
+
+// Dua sheet "rekap" yang BERBEDA — jangan pernah disamakan namanya:
+//  - REKAP_VOTING dicetak OTOMATIS oleh tulisRekap(), boleh ditimpa/di-clear.
+//  - REKAP_AKHIR dibuat & diisi TANGAN oleh panitia (data administratif,
+//    lihat bacaRekapAkhir_()) — kode ini HANYA MEMBACANYA, tidak pernah
+//    menulis atau meng-clear-nya. Sengaja dibuat berbeda persis supaya
+//    tulisRekap() mustahil menimpa data administratif itu.
+const SHEET_REKAP_VOTING = 'Rekap Voting';
+const SHEET_REKAP_AKHIR  = 'Rekap';
 
 const CACHE_DETIK = 21600;  // 6 jam
 const FOTO_LEBAR  = 400;    // lh3 =w400 → ±95 KB per PNG, alpha bertahan
@@ -339,6 +347,130 @@ function progresPerVoter_(vote) {
 }
 
 
+// === SECTION: BACA REKAP AKHIR ==========================================
+
+/**
+ * Sheet "Rekap" dibuat & diisi TANGAN oleh panitia: data administratif
+ * (jabatan, masa kerja, hukuman disiplin, evaluasi PPK 2024/2025, IST tahap II,
+ * tingkat pendidikan, prestasi EOM/JP) untuk tiap kandidat — angka yang
+ * TIDAK ADA di sheet lain mana pun, jadi tidak mungkin diturunkan dari vote.
+ *
+ * Headernya DUA BARIS dengan sel gabung (mis. "EVALUASI PPK" menaungi
+ * 2024 & 2025 di baris kedua), sehingga TIDAK bisa dibaca lewat nama kolom
+ * seperti bacaTabel_() — dibaca lewat POSISI kolom tetap (A..Q). Baris data
+ * mulai baris ke-3.
+ *
+ * HANYA DIBACA. Kode ini tidak pernah menulis atau meng-clear sheet ini.
+ */
+const KOLOM_REKAP_AKHIR = [
+  'id', 'nama', 'jabatan', 'masaKerja', 'hukumanDisiplin',
+  'evaluasiPpk2024', 'evaluasiPpk2025', 'istTahapII', 'tingkatPendidikan',
+  'prestasiEom', 'prestasiJp', 'penampilanSheet', 'komunikasiSheet',
+  'etikaSheet', 'pembawaanDiriSheet', 'nilaiSboSheet', 'totalSheet'
+];
+
+/** null bila sheet belum ada — dianggap fitur opsional, bukan galat fatal. */
+function bacaRekapAkhir_() {
+  let sh;
+  try { sh = sheet_(SHEET_REKAP_AKHIR); } catch (e) { return null; }
+
+  const nilai = sh.getDataRange().getValues();
+  if (nilai.length < 3) return [];   // hanya header, belum ada baris kandidat
+
+  const out = [];
+  for (let r = 2; r < nilai.length; r++) {   // baris data mulai indeks 2 (baris ke-3)
+    const baris = nilai[r];
+    const id = teks_(baris[0]);
+    if (!id) continue;
+    const obj = {};
+    KOLOM_REKAP_AKHIR.forEach(function (nama, i) { obj[nama] = baris[i]; });
+    out.push({
+      id: id,
+      nama: teks_(obj.nama),
+      jabatan: teks_(obj.jabatan),
+      masaKerja: Number(obj.masaKerja) || 0,
+      hukumanDisiplin: Number(obj.hukumanDisiplin) || 0,
+      evaluasiPpk2024: Number(obj.evaluasiPpk2024) || 0,
+      evaluasiPpk2025: Number(obj.evaluasiPpk2025) || 0,
+      istTahapII: Number(obj.istTahapII) || 0,
+      tingkatPendidikan: Number(obj.tingkatPendidikan) || 0,
+      prestasiEom: Number(obj.prestasiEom) || 0,
+      prestasiJp: Number(obj.prestasiJp) || 0,
+      totalSheet: Number(obj.totalSheet) || 0
+    });
+  }
+  return out;
+}
+
+/**
+ * Menggabungkan data administratif sheet "Rekap" dengan poin dari vote:
+ *  - kolom Beauty (Penampilan/Komunikasi/Etika/Pembawaan diri di sheet asli)
+ *    diambil dari indikator babak BE4, urut sesuai kolom `urutan` — TIDAK
+ *    ditulis nama-nama itu di kode, supaya tetap ikut sheet bila berubah.
+ *  - Nilai SBO = seluruh poin di luar babak BE4 (Budaya Organisasi + Core
+ *    Values), dihitung sebagai total dikurangi Beauty — bukan diasumsikan
+ *    nama babaknya.
+ * Total akhir dihitung ULANG dari komponen (bukan dibaca dari kolom TOTAL
+ * sheet), supaya tidak dobel-hitung bila panitia sudah mengisi sendiri
+ * kolom Beauty/Nilai SBO di sheet setelah melihat dashboard ini.
+ */
+function hitungRekapAkhir_(master, R) {
+  const admin = bacaRekapAkhir_();
+  if (admin === null) {
+    return { ok: false, message: 'Sheet "' + SHEET_REKAP_AKHIR + '" belum dibuat.' };
+  }
+  if (!admin.length) {
+    return { ok: false, message: 'Sheet "' + SHEET_REKAP_AKHIR + '" belum berisi baris kandidat.' };
+  }
+
+  const indikatorBeauty = master.indikator
+    .filter(function (i) { return i.babakId === 'BE4'; })
+    .sort(function (a, b) { return a.urutan - b.urutan; });
+
+  const petaKandidat = {};
+  R.kandidat.forEach(function (k) { petaKandidat[k.id] = k; });
+
+  const kandidat = admin.map(function (a) {
+    const k = petaKandidat[a.id];
+    const beauty = indikatorBeauty.map(function (ind) {
+      return (k && k.perIndikator[ind.indikatorId]) || 0;
+    });
+    const totalBeauty = beauty.reduce(function (s, v) { return s + v; }, 0);
+    const totalSemua = k ? k.total : 0;
+    const nilaiSbo = totalSemua - totalBeauty;
+    const adminSubtotal = a.hukumanDisiplin + a.evaluasiPpk2024 + a.evaluasiPpk2025
+      + a.istTahapII + a.tingkatPendidikan + a.prestasiEom + a.prestasiJp;
+
+    return {
+      id: a.id,
+      nama: (k && k.nama) || a.nama || a.id,
+      pendek: (k && k.pendek) || namaPendek_(a.nama),
+      gelar: (k && k.gelar) || gelarDari_(a.nama),
+      inisial: (k && k.inisial) || inisial_(a.nama),
+      foto: k ? k.foto : '',
+      jabatan: a.jabatan, masaKerja: a.masaKerja,
+      hukumanDisiplin: a.hukumanDisiplin,
+      evaluasiPpk2024: a.evaluasiPpk2024, evaluasiPpk2025: a.evaluasiPpk2025,
+      istTahapII: a.istTahapII, tingkatPendidikan: a.tingkatPendidikan,
+      prestasiEom: a.prestasiEom, prestasiJp: a.prestasiJp,
+      adminSubtotal: adminSubtotal,
+      beauty: beauty,
+      nilaiSbo: nilaiSbo,
+      totalAkhir: adminSubtotal + totalBeauty + nilaiSbo,
+      totalSheet: a.totalSheet
+    };
+  }).sort(function (x, y) { return y.totalAkhir - x.totalAkhir || x.nama.localeCompare(y.nama); });
+
+  return {
+    ok: true,
+    kolomBeauty: indikatorBeauty.map(function (i) {
+      return { indikatorId: i.indikatorId, indikatorNama: i.indikatorNama };
+    }),
+    kandidat: kandidat
+  };
+}
+
+
 // === SECTION: API — master ==============================================
 
 function getMasterData() {
@@ -583,7 +715,7 @@ function hitungRekap_(master) {
 
   const tuntas = partisipasi.filter(function (x) { return x.tuntas; }).length;
 
-  return {
+  const R = {
     ok: true,
     ringkas: {
       pemilihBerhak: partisipasi.length,
@@ -605,6 +737,16 @@ function hitungRekap_(master) {
     partisipasi: partisipasi,
     dibuat: new Date().toISOString()
   };
+
+  // Fitur opsional: sheet "Rekap" administratif panitia belum tentu ada.
+  // Kegagalannya tidak boleh menjatuhkan seluruh dashboard.
+  try {
+    R.rekapAkhir = hitungRekapAkhir_(master, R);
+  } catch (e) {
+    R.rekapAkhir = { ok: false, message: 'Gagal menghitung rekap akhir: ' + String(e && e.message ? e.message : e) };
+  }
+
+  return R;
 }
 
 
@@ -644,7 +786,7 @@ function tulisRekap() {
 
   const ss = ss_();
   let sh;
-  try { sh = sheet_(SHEET_REKAP); } catch (e) { sh = ss.insertSheet(SHEET_REKAP); }
+  try { sh = sheet_(SHEET_REKAP_VOTING); } catch (e) { sh = ss.insertSheet(SHEET_REKAP_VOTING); }
   sh.clear();
 
   const baris = [];
@@ -693,6 +835,6 @@ function tulisRekap() {
   sh.getRange(5, 1, 1, lebar).setFontWeight('bold');
   SpreadsheetApp.flush();
 
-  return 'Sheet "' + SHEET_REKAP + '" diperbarui — ' + R.kandidat.length + ' kandidat, '
+  return 'Sheet "' + SHEET_REKAP_VOTING + '" diperbarui — ' + R.kandidat.length + ' kandidat, '
     + R.indikator.length + ' indikator, ' + R.ringkas.pemilihTuntas + ' pemilih tuntas.';
 }
