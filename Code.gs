@@ -658,10 +658,16 @@ function hitungRekap_(master) {
   master.indikator.forEach(function (i) { petaInd[i.indikatorId] = i; });
 
   // Kelompok & babak dalam urutan tampil.
+  // PENTING: nama kelompok pakai judulKelompok (nama sub-nilai, mis. "Be a
+  // Leader, not a Boss"), BUKAN kelompokNama mentah — pada bentuk sheet saat
+  // ini kelompokNama sama persis dengan nama babak untuk SEMUA sub-kelompok
+  // di dalamnya (semua BO5-x = "Budaya Organisasi", semua CV-x = "Core Values
+  // ASN Berakhlak"), jadi memakainya langsung membuat dropdown/tabel dashboard
+  // menampilkan nama yang berulang identik dan tidak bisa dibedakan.
   const kelompok = [], babak = [], lihatK = {}, lihatB = {};
   master.indikator.forEach(function (i) {
     if (!lihatK[i.kelompokId]) {
-      lihatK[i.kelompokId] = { id: i.kelompokId, nama: i.kelompokNama,
+      lihatK[i.kelompokId] = { id: i.kelompokId, nama: i.judulKelompok,
         babakId: i.babakId, babakNama: i.babakNama, jumlah: 0 };
       kelompok.push(lihatK[i.kelompokId]);
     }
@@ -731,6 +737,8 @@ function hitungRekap_(master) {
     indikator: master.indikator.map(function (i) {
       return { indikatorId: i.indikatorId, indikatorNama: i.indikatorNama,
                kelompokId: i.kelompokId, kelompokNama: i.kelompokNama,
+               judulKelompok: i.judulKelompok, labelIndikator: i.labelIndikator,
+               rincian: i.rincian,
                babakId: i.babakId, babakNama: i.babakNama, deskripsi: i.deskripsi };
     }),
     skorIndikator: skorIndikator,
@@ -814,7 +822,7 @@ function tulisRekap() {
       .slice(0, 5)
       .map(function (x) { return x.nama + ' (' + x.poin + ')'; });
     while (urut.length < 5) urut.push('');
-    baris.push([ind.babakNama, ind.kelompokNama, ind.indikatorNama].concat(urut));
+    baris.push([ind.babakNama, ind.judulKelompok, ind.rincian || ind.indikatorNama].concat(urut));
   });
   baris.push([]);
   baris.push(['PARTISIPASI']);

@@ -200,6 +200,26 @@ select{min-width:min(320px,100%)}
 .legenda span{display:flex; align-items:center; gap:6px}
 .legenda i{width:12px; height:12px; border-radius:3px; display:block}
 
+/* === SECTION: DAFTAR INDIKATOR BERWARNA ================================
+   Kelompok (sub-nilai, mis. "Be a Leader, not a Boss") diberi warna sendiri
+   supaya bisa dibedakan sekilas — teks kelompokNama mentah kerap berulang
+   identik antar sub-kelompok pada bentuk sheet saat ini. */
+.titik{width:9px; height:9px; border-radius:50%; flex:none; display:inline-block}
+.daftar-indikator{
+  display:flex; flex-direction:column; gap:2px; max-height:280px; overflow-y:auto;
+  border:1px solid rgba(139,46,32,.16); border-radius:var(--r-lg);
+  background:var(--gading-terang); margin-bottom:18px; padding:5px;
+}
+.baris-indikator{
+  display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px;
+  border-left:4px solid transparent; cursor:pointer; font:500 12.5px var(--ui);
+  background:transparent; border-top:0; border-right:0; border-bottom:0; text-align:left; width:100%;
+}
+.baris-indikator:hover{background:rgba(201,162,39,.12)}
+.baris-indikator.aktif{background:rgba(139,46,32,.12); font-weight:600}
+.baris-indikator .teks{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--tinta)}
+.baris-indikator .tag{flex:none; font-size:10.5px; color:var(--tinta-samar); max-width:34%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
 /* === SECTION: MUAT ==================================================== */
 #muat{display:none; align-items:center; gap:10px; padding:30px; color:var(--tinta-samar); font-size:13px}
 #muat.tampil{display:flex}
@@ -289,8 +309,10 @@ select{min-width:min(320px,100%)}
   <!-- PER KELOMPOK -->
   <section class="panel" id="p-kelompok">
     <h2 class="judul">Telusuri per kelompok</h2>
-    <p class="sub">Peringkat di dalam satu kelompok indikator.</p>
+    <p class="sub">Ada 3 babak penilaian besar (Budaya Organisasi, Core Values ASN Berakhlak, Beauty) — pilih babak dulu, lalu kelompok (sub-nilai) di dalamnya.</p>
     <div class="kendali">
+      <label class="sr" for="pilihBabakKelompok">Pilih babak</label>
+      <select id="pilihBabakKelompok"></select>
       <label class="sr" for="pilihKelompok">Pilih kelompok</label>
       <select id="pilihKelompok"></select>
     </div>
@@ -300,11 +322,16 @@ select{min-width:min(320px,100%)}
   <!-- PER INDIKATOR -->
   <section class="panel" id="p-indikator">
     <h2 class="judul">Telusuri per indikator</h2>
-    <p class="sub">Unit penilaian sesungguhnya. Tiap pemilih memberi 3 nama di setiap indikator.</p>
+    <p class="sub">Unit penilaian sesungguhnya — 75 pertanyaan berbeda. Warna menandai kelompok (sub-nilai) asalnya.</p>
     <div class="kendali">
-      <label class="sr" for="pilihIndikator">Pilih indikator</label>
-      <select id="pilihIndikator"></select>
+      <label class="sr" for="pilihBabakIndikator">Babak</label>
+      <select id="pilihBabakIndikator"><option value="">Semua babak</option></select>
+      <label class="sr" for="pilihKelompokIndikator">Kelompok</label>
+      <select id="pilihKelompokIndikator"><option value="">Semua kelompok</option></select>
+      <input type="search" id="cariIndikator" placeholder="Cari kata dalam pertanyaan…">
     </div>
+    <div class="legenda" id="legendaIndikator"></div>
+    <div class="daftar-indikator" id="daftarIndikator"></div>
     <div id="isiIndikator"></div>
   </section>
 
@@ -379,6 +406,19 @@ function batang(nama, nilai, maks, kelas){
     '<div class="batang-nilai num">' + nilai + '</div>' +
   '</div>';
 }
+/** Sama seperti batang(), tapi warna bilah bebas (dipakai untuk kode warna kelompok)
+    dan boleh menampilkan label kelompok kecil di bawahnya untuk konteks. */
+function batangWarna(nama, nilai, maks, warna, tag){
+  var lebar = maks > 0 ? (nilai / maks * 100) : 0;
+  return '<div class="batang-baris" style="flex-wrap:wrap">' +
+    '<div class="batang-nama" title="' + esc(nama) + '">' + esc(nama) + '</div>' +
+    '<div class="batang-jalur"><div class="batang-isi" style="width:' + lebar.toFixed(1) + '%;background:' + warna + '"></div></div>' +
+    '<div class="batang-nilai num">' + nilai + '</div>' +
+    (tag ? '<div style="flex-basis:100%;font-size:10.5px;color:var(--tinta-samar);padding-left:2px">' +
+           '<i class="titik" style="background:' + warna + ';vertical-align:middle;margin-right:5px"></i>' +
+           esc(tag) + '</div>' : '') +
+  '</div>';
+}
 function kartuAngka(label, nilai, kaki, sorot){
   return '<div class="kartu' + (sorot ? ' sorot' : '') + '">' +
     '<div class="label">' + esc(label) + '</div>' +
@@ -391,6 +431,20 @@ function petaKandidat(){
   D.kandidat.forEach(function(k){ m[k.id] = k; });
   return m;
 }
+
+/* Tiap kelompok (sub-nilai) diberi warna sendiri agar bisa dibedakan sekilas
+   di daftar/bilah yang mencampur banyak kelompok — teks kelompokNama/
+   indikatorNama saja sering identik antar baris pada bentuk sheet ini. */
+var PALET_KELOMPOK = ['#8B2E20','#C9A227','#3E5C4B','#6E4A7E','#2E6E8B','#A3572B',
+                      '#4A7C59','#8B5E3C','#5B6E8B','#8B3A5C','#6E8B2E','#8B7A2E','#2E8B7A'];
+var WARNA_KELOMPOK = {};
+function siapkanWarnaKelompok(){
+  WARNA_KELOMPOK = {};
+  D.kelompok.forEach(function(g, i){ WARNA_KELOMPOK[g.id] = PALET_KELOMPOK[i % PALET_KELOMPOK.length]; });
+}
+function warnaKelompok(id){ return WARNA_KELOMPOK[id] || '#8A7358'; }
+/** Teks yang benar-benar membedakan satu indikator dari yang lain di kelompok sama. */
+function teksIndikator(ind){ return ind.rincian || ind.labelIndikator || ind.indikatorNama; }
 
 /* === SECTION: RINGKASAN === */
 function gambarRingkas(){
@@ -497,9 +551,12 @@ function gambarKandidat(){
     return batang(g.nama, k.perKelompok[g.id] || 0, maksKel, 'emas');
   }).join('');
 
-  // Indikator terkuat
+  // Indikator terkuat — pakai rincian (teks pertanyaan sesungguhnya), bukan
+  // indikatorNama, karena indikatorNama sering sama persis untuk semua
+  // indikator dalam satu kelompok pada bentuk sheet ini.
   var terkuat = D.indikator.map(function(ind){
-    return { nama: ind.indikatorNama, kel: ind.kelompokNama, poin: k.perIndikator[ind.indikatorId] || 0 };
+    return { nama: teksIndikator(ind), kelId: ind.kelompokId, kel: ind.judulKelompok,
+             poin: k.perIndikator[ind.indikatorId] || 0 };
   }).sort(function(a, b){ return b.poin - a.poin; }).slice(0, 10);
   var maksInd = terkuat.length ? Math.max(terkuat[0].poin, 1) : 1;
 
@@ -526,16 +583,25 @@ function gambarKandidat(){
       '</div>' +
     '</div>' +
     '<h3 style="font-size:19px;margin-bottom:8px">Sepuluh indikator terkuat</h3>' +
+    '<p class="sub" style="margin-bottom:10px">Warna bilah menandai kelompok (sub-nilai) asal indikator itu.</p>' +
     (k.total
-      ? terkuat.map(function(t){ return batang(t.nama, t.poin, maksInd); }).join('')
+      ? terkuat.map(function(t){ return batangWarna(t.nama, t.poin, maksInd, warnaKelompok(t.kelId), t.kel); }).join('')
       : '<div class="kosong">Belum ada poin untuk ditampilkan.</div>');
 }
 
 /* === SECTION: PER KELOMPOK === */
+function isiPilihBabakKelompok(){
+  $('#pilihBabakKelompok').innerHTML = D.babak.map(function(b){
+    return '<option value="' + esc(b.id) + '">' + esc(b.nama) + '</option>';
+  }).join('');
+}
+
 function isiPilihKelompok(){
-  $('#pilihKelompok').innerHTML = D.kelompok.map(function(g){
-    return '<option value="' + esc(g.id) + '">' + esc(g.babakNama) + ' — ' + esc(g.nama) +
-           ' (' + g.jumlah + ' indikator)</option>';
+  var babakId = $('#pilihBabakKelompok').value;
+  var opsi = D.kelompok.filter(function(g){ return g.babakId === babakId; });
+  $('#pilihKelompok').innerHTML = opsi.map(function(g){
+    return '<option value="' + esc(g.id) + '" style="color:' + warnaKelompok(g.id) + '">● ' +
+           esc(g.nama) + ' (' + g.jumlah + ' indikator)</option>';
   }).join('');
 }
 
@@ -563,14 +629,14 @@ function gambarKelompok(){
     (adaPoin ? urut.map(function(x){ return batang(x.nama, x.poin, maks, 'emas'); }).join('')
              : '<div class="kosong">Belum ada penilaian pada kelompok ini.</div>') +
     '<h3 style="font-size:19px;margin:22px 0 8px">Indikator di dalamnya</h3>' +
-    '<div class="bingkai-tabel"><table><thead><tr><th>Indikator</th><th>Tiga besar</th></tr></thead><tbody>' +
+    '<div class="bingkai-tabel"><table><thead><tr><th>Rincian</th><th>Tiga besar</th></tr></thead><tbody>' +
     indKel.map(function(ind){
       var skor = D.skorIndikator[ind.indikatorId] || {};
       var pk = petaKandidat();
       var tiga = Object.keys(skor).map(function(pid){
         return { nama: pk[pid] ? pk[pid].pendek : pid, poin: skor[pid] };
       }).sort(function(a, b){ return b.poin - a.poin; }).slice(0, 3);
-      return '<tr><td>' + esc(ind.indikatorNama) + '</td><td>' +
+      return '<tr><td>' + esc(teksIndikator(ind)) + '</td><td>' +
         (tiga.length ? tiga.map(function(t, i){
           return '<span class="pil">' + (i + 1) + '. ' + esc(t.nama) + ' (' + t.poin + ')</span>';
         }).join('') : '<span style="color:var(--tinta-samar)">—</span>') +
@@ -579,21 +645,71 @@ function gambarKelompok(){
     '</tbody></table></div>';
 }
 
-/* === SECTION: PER INDIKATOR === */
-function isiPilihIndikator(){
-  $('#pilihIndikator').innerHTML = D.indikator.map(function(ind, i){
-    return '<option value="' + esc(ind.indikatorId) + '">' + (i + 1) + '. ' +
-           esc(ind.kelompokNama) + ' — ' + esc(ind.indikatorNama) + '</option>';
+/* === SECTION: PER INDIKATOR ===
+   Diganti dari <select> tunggal menjadi babak → kelompok → kata kunci, karena
+   indikatorNama saja sering identik untuk banyak baris (mis. 6 baris "Be a
+   Leader, not a Boss") — dropdown lama menampilkan opsi yang tampak berulang
+   dan tidak bisa dibedakan. Sekarang: daftar berwarna per kelompok, dan kata
+   kunci mencari di TEKS RINCIAN (pertanyaan sesungguhnya), bukan cuma nama. */
+var indikatorAktif = null;
+
+function isiPilihBabakIndikator(){
+  $('#pilihBabakIndikator').innerHTML = '<option value="">Semua babak</option>' +
+    D.babak.map(function(b){ return '<option value="' + esc(b.id) + '">' + esc(b.nama) + '</option>'; }).join('');
+}
+
+function isiPilihKelompokIndikator(){
+  var babakId = $('#pilihBabakIndikator').value;
+  var opsi = babakId ? D.kelompok.filter(function(g){ return g.babakId === babakId; }) : D.kelompok;
+  $('#pilihKelompokIndikator').innerHTML = '<option value="">Semua kelompok</option>' +
+    opsi.map(function(g){
+      return '<option value="' + esc(g.id) + '" style="color:' + warnaKelompok(g.id) + '">● ' + esc(g.nama) + '</option>';
+    }).join('');
+}
+
+function gambarLegendaIndikator(){
+  var babakId = $('#pilihBabakIndikator').value;
+  var opsi = babakId ? D.kelompok.filter(function(g){ return g.babakId === babakId; }) : D.kelompok;
+  $('#legendaIndikator').innerHTML = opsi.map(function(g){
+    return '<span><i class="titik" style="background:' + warnaKelompok(g.id) + '"></i>' + esc(g.nama) + '</span>';
   }).join('');
 }
 
+function daftarIndikatorTersaring(){
+  var babakId = $('#pilihBabakIndikator').value;
+  var kelId = $('#pilihKelompokIndikator').value;
+  var q = ($('#cariIndikator').value || '').trim().toLowerCase();
+  return D.indikator.filter(function(ind){
+    if (babakId && ind.babakId !== babakId) return false;
+    if (kelId && ind.kelompokId !== kelId) return false;
+    if (!q) return true;
+    var teks = (teksIndikator(ind) + ' ' + ind.judulKelompok + ' ' + ind.babakNama).toLowerCase();
+    return teks.indexOf(q) >= 0;
+  });
+}
+
+function gambarDaftarIndikator(){
+  var daftar = daftarIndikatorTersaring();
+  if (!indikatorAktif || !daftar.some(function(x){ return x.indikatorId === indikatorAktif; })){
+    indikatorAktif = daftar.length ? daftar[0].indikatorId : null;
+  }
+  $('#daftarIndikator').innerHTML = daftar.length ? daftar.map(function(ind){
+    return '<button type="button" class="baris-indikator' +
+      (ind.indikatorId === indikatorAktif ? ' aktif' : '') + '" style="border-left-color:' +
+      warnaKelompok(ind.kelompokId) + '" data-id="' + esc(ind.indikatorId) + '">' +
+      '<span class="teks">' + esc(teksIndikator(ind)) + '</span>' +
+      '<span class="tag">' + esc(ind.judulKelompok) + '</span>' +
+    '</button>';
+  }).join('') : '<div class="kosong">Tidak ada indikator yang cocok kata kunci itu.</div>';
+  gambarIndikator();
+}
+
 function gambarIndikator(){
-  var id = $('#pilihIndikator').value;
+  var id = indikatorAktif;
   var ind = D.indikator.filter(function(x){ return x.indikatorId === id; })[0];
   if (!ind){ $('#isiIndikator').innerHTML = ''; return; }
 
   var skor = D.skorIndikator[id] || {};
-  var pk = petaKandidat();
   var urut = D.kandidat.map(function(k){
     return { nama: k.pendek, poin: skor[k.id] || 0 };
   }).sort(function(a, b){ return b.poin - a.poin || a.nama.localeCompare(b.nama); });
@@ -602,10 +718,9 @@ function gambarIndikator(){
   var totalPoin = urut.reduce(function(a, x){ return a + x.poin; }, 0);
 
   $('#isiIndikator').innerHTML =
-    '<div class="kartu" style="margin-bottom:18px">' +
-      '<div class="label">' + esc(ind.babakNama) + ' · ' + esc(ind.kelompokNama) + '</div>' +
-      '<div style="font:600 19px/1.35 var(--ui);margin-top:6px">' + esc(ind.indikatorNama) + '</div>' +
-      '<div style="font-size:12.5px;color:var(--tinta-lunak);margin-top:4px">' + esc(ind.deskripsi) + '</div>' +
+    '<div class="kartu" style="margin-bottom:18px;border-left:4px solid ' + warnaKelompok(ind.kelompokId) + '">' +
+      '<div class="label">' + esc(ind.babakNama) + ' · ' + esc(ind.judulKelompok) + '</div>' +
+      '<div style="font:600 19px/1.35 var(--ui);margin-top:6px">' + esc(teksIndikator(ind)) + '</div>' +
     '</div>' +
     '<div class="angka">' +
       kartuAngka('POIN TERKUMPUL', totalPoin, 'pada indikator ini') +
@@ -671,7 +786,6 @@ function gambarRekapAkhir(){
       beautyTd +
       '<td class="kanan num">' + k.nilaiSbo + '</td>' +
       '<td class="kanan num"><b>' + k.totalAkhir + '</b></td>' +
-      '<td class="kanan num" style="color:var(--tinta-samar)">' + k.totalSheet + '</td>' +
     '</tr>';
   }).join('');
 
@@ -685,8 +799,12 @@ function gambarRekapAkhir(){
       '<th class="kanan">Subtotal admin</th>' +
       kepalaBeauty +
       '<th class="kanan">Nilai SBO</th><th class="kanan">Total akhir</th>' +
-      '<th class="kanan">Total (sheet)</th>' +
-    '</tr></thead><tbody>' + baris + '</tbody></table></div>';
+    '</tr></thead><tbody>' + baris + '</tbody></table></div>' +
+    '<p style="margin-top:10px;font-size:11.5px;color:var(--tinta-samar)">' +
+      'Kolom "Total" di sheet "Rekap" sengaja tidak ditampilkan di sini — nilai itu masih ' +
+      'sementara di spreadsheet karena akan ditotal lagi bersama penilaian lain di sheet tersebut. ' +
+      '"Total akhir" pada tabel ini dihitung ulang dari komponennya sendiri.' +
+    '</p>';
 }
 
 /* === SECTION: MUAT DATA === */
@@ -696,10 +814,12 @@ function ambilData(){
     muat(false);
     if (!h || !h.ok) throw new Error((h && h.message) || 'Gagal memuat.');
     D = h;
+    siapkanWarnaKelompok();
     gambarRingkas();
     isiPilihKandidat();  gambarKandidat();
-    isiPilihKelompok();  gambarKelompok();
-    isiPilihIndikator(); gambarIndikator();
+    isiPilihBabakKelompok();  isiPilihKelompok();  gambarKelompok();
+    isiPilihBabakIndikator(); isiPilihKelompokIndikator();
+    gambarLegendaIndikator(); gambarDaftarIndikator();
     gambarPeringkat();
     gambarPartisipasi();
     gambarRekapAkhir();
@@ -740,8 +860,19 @@ $('#tab').addEventListener('click', function(e){
   $$('.panel').forEach(function(p){ p.classList.toggle('aktif', p.id === 'p-' + b.getAttribute('data-p')); });
 });
 $('#pilihKandidat').addEventListener('change', gambarKandidat);
+$('#pilihBabakKelompok').addEventListener('change', function(){ isiPilihKelompok(); gambarKelompok(); });
 $('#pilihKelompok').addEventListener('change', gambarKelompok);
-$('#pilihIndikator').addEventListener('change', gambarIndikator);
+$('#pilihBabakIndikator').addEventListener('change', function(){
+  isiPilihKelompokIndikator(); gambarLegendaIndikator(); gambarDaftarIndikator();
+});
+$('#pilihKelompokIndikator').addEventListener('change', gambarDaftarIndikator);
+$('#cariIndikator').addEventListener('input', gambarDaftarIndikator);
+$('#daftarIndikator').addEventListener('click', function(e){
+  var b = e.target.closest('.baris-indikator');
+  if (!b) return;
+  indikatorAktif = b.getAttribute('data-id');
+  gambarDaftarIndikator();
+});
 $('#cariPeringkat').addEventListener('input', gambarPeringkat);
 $('#tblCsv').addEventListener('click', unduhCsv);
 $$('#tblPeringkat th[data-urut]').forEach(function(th){
