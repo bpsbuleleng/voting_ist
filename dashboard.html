@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Dashboard — Insan Statistik Teladan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* === SECTION: TOKEN (sama dengan aplikasi voting — tahap 1) ============ */
+:root{
+  --gading:#F6EFE1; --gading-terang:#FFFDF7; --gading-teduh:#EADFC8;
+  --tinta:#241811; --tinta-lunak:#5B4636; --tinta-samar:#8A7358;
+  --bata:#8B2E20; --bata-pekat:#6E2117;
+  --emas:#C9A227; --emas-garis:#B08420; --emas-teks:#7A5A12;
+  --lumut:#3E5C4B; --hancur:#A33A28;
+  --r-sm:8px; --r-md:12px; --r-lg:14px; --r-xl:16px;
+  --naik-1:0 1px 3px rgba(60,35,20,.08);
+  --naik-2:0 12px 26px -12px rgba(60,35,20,.45);
+  --ui:Inter,system-ui,-apple-system,sans-serif;
+  --display:'Cormorant Garamond',Georgia,serif;
+  --sisi:16px;
+}
+@media (min-width:900px){ :root{ --sisi:32px; } }
+
+*{box-sizing:border-box}
+html{overflow-x:clip}
+body{
+  margin:0; background:var(--gading); color:var(--tinta);
+  font:400 14px/1.55 var(--ui); -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0; font-family:var(--display); font-weight:600; letter-spacing:-.02em}
+button{font-family:inherit; cursor:pointer}
+.num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+:focus-visible{outline:2px solid var(--bata); outline-offset:2px; border-radius:4px}
+@keyframes putar{to{transform:rotate(360deg)}}
+
+/* === SECTION: GERBANG SANDI =========================================== */
+#gerbang{
+  position:fixed; inset:0; z-index:50; display:flex;
+  align-items:center; justify-content:center; padding:20px;
+  background:radial-gradient(120% 70% at 50% 20%,#FFFBF0,var(--gading) 60%,var(--gading-teduh));
+}
+#gerbang.pergi{display:none}
+.kotak-sandi{
+  width:min(420px,100%); padding:30px; border-radius:var(--r-xl);
+  background:var(--gading-terang); border:1px solid rgba(139,46,32,.18);
+  box-shadow:0 26px 60px -30px rgba(60,35,20,.5);
+}
+.kotak-sandi .eyebrow{font:600 10px var(--ui); letter-spacing:.24em; color:var(--bata)}
+.kotak-sandi h1{font-size:32px; margin:10px 0 6px}
+.kotak-sandi p{margin:0 0 20px; color:var(--tinta-lunak); font-size:13px}
+.masukan{
+  width:100%; min-height:52px; padding:0 16px; border-radius:var(--r-md);
+  border:1px solid rgba(139,46,32,.3); background:#FBF5E9;
+  font:500 15px var(--ui); color:var(--tinta); outline:none;
+}
+.masukan:focus{border-color:var(--bata); box-shadow:0 0 0 3px rgba(139,46,32,.14)}
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:46px; padding:0 20px; border:0; border-radius:var(--r-md);
+  font:600 13.5px var(--ui); transition:background .2s;
+}
+.btn-1{background:var(--bata); color:var(--gading)}
+.btn-1:hover{background:var(--bata-pekat)}
+.btn-2{background:var(--gading-terang); color:var(--bata-pekat); border:1px solid rgba(139,46,32,.26); font-weight:500}
+.btn-2:hover{background:rgba(201,162,39,.14)}
+.btn[disabled]{opacity:.5; cursor:not-allowed}
+#galatSandi:not(:empty){
+  margin-top:12px; padding:9px 12px; border-radius:var(--r-sm);
+  background:rgba(163,58,40,.1); border:1px solid rgba(163,58,40,.35);
+  color:#8E2E1E; font:500 12px/1.5 var(--ui);
+}
+
+/* === SECTION: KERANGKA ================================================ */
+header.bar{
+  position:sticky; top:0; z-index:20; display:flex; align-items:center;
+  gap:14px; flex-wrap:wrap; padding:10px var(--sisi);
+  background:rgba(255,252,243,.95); backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(139,46,32,.14);
+}
+.merek{font:600 10px var(--ui); letter-spacing:.2em; color:var(--bata); white-space:nowrap}
+.tab{display:flex; gap:4px; flex-wrap:wrap; flex:1}
+.tab button{
+  min-height:38px; padding:0 13px; border:1px solid transparent; border-radius:var(--r-sm);
+  background:transparent; color:var(--tinta-lunak); font:500 12.5px var(--ui);
+}
+.tab button:hover{background:rgba(201,162,39,.13)}
+.tab button[aria-selected="true"]{background:var(--bata); color:var(--gading); font-weight:600}
+main{padding:20px var(--sisi) 60px; max-width:1400px; margin:0 auto}
+.panel{display:none}
+.panel.aktif{display:block}
+h2.judul{font-size:clamp(24px,3.6vw,38px); margin-bottom:4px}
+.sub{color:var(--tinta-samar); font-size:12.5px; margin-bottom:20px}
+
+/* === SECTION: KARTU ANGKA ============================================= */
+.angka{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); margin-bottom:26px}
+.kartu{
+  padding:16px 18px; border-radius:var(--r-lg); background:var(--gading-terang);
+  border:1px solid rgba(139,46,32,.16); box-shadow:var(--naik-1);
+}
+.kartu .label{font:600 9.5px var(--ui); letter-spacing:.16em; color:var(--tinta-samar)}
+.kartu .nilai{font:600 34px/1.1 var(--display); color:var(--tinta); margin-top:6px}
+.kartu .kaki{font:400 11px var(--ui); color:var(--tinta-samar); margin-top:2px}
+.kartu.sorot{background:linear-gradient(#FFFCF3,#F4EBD7); border-color:rgba(176,132,32,.5)}
+.kartu.sorot .nilai{color:var(--bata)}
+
+/* === SECTION: BATANG ================================================== */
+.batang-baris{display:flex; align-items:center; gap:10px; padding:5px 0}
+.batang-nama{flex:none; width:150px; font:500 12px var(--ui); text-align:right;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.batang-jalur{flex:1; height:22px; background:rgba(176,132,32,.14); border-radius:5px; overflow:hidden; position:relative}
+.batang-isi{height:100%; background:linear-gradient(90deg,var(--bata),#A8442F); border-radius:5px; min-width:2px;
+  transition:width .5s cubic-bezier(.16,1,.3,1)}
+.batang-isi.emas{background:linear-gradient(90deg,var(--emas-garis),var(--emas))}
+.batang-isi.lumut{background:linear-gradient(90deg,var(--lumut),#5A7C67)}
+.batang-nilai{flex:none; width:64px; font:600 12px var(--ui); color:var(--bata)}
+@media (max-width:640px){ .batang-nama{width:104px; font-size:11px} .batang-nilai{width:52px} }
+
+/* === SECTION: TABEL =================================================== */
+.bingkai-tabel{overflow-x:auto; border:1px solid rgba(139,46,32,.16); border-radius:var(--r-lg); background:var(--gading-terang)}
+table{border-collapse:collapse; width:100%; min-width:560px}
+th,td{padding:9px 12px; text-align:left; border-bottom:1px solid rgba(139,46,32,.09); font-size:12.5px}
+th{background:rgba(201,162,39,.13); font:600 10px var(--ui); letter-spacing:.1em;
+  text-transform:uppercase; color:var(--tinta-lunak); position:sticky; top:0; cursor:pointer; white-space:nowrap}
+th:hover{background:rgba(201,162,39,.24)}
+tbody tr:hover{background:rgba(201,162,39,.08)}
+td.kanan,th.kanan{text-align:right}
+.rank-sel{font:600 12px var(--ui); color:var(--bata); width:44px}
+tr.atas3 .rank-sel{background:var(--bata); color:var(--gading); border-radius:11px; display:inline-block;
+  min-width:22px; text-align:center; padding:1px 6px}
+
+/* === SECTION: KENDALI ================================================= */
+.kendali{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px}
+select,input[type="search"]{
+  min-height:42px; padding:0 12px; border-radius:var(--r-sm);
+  border:1px solid rgba(139,46,32,.26); background:var(--gading-terang);
+  font:500 13px var(--ui); color:var(--tinta); outline:none; max-width:100%;
+}
+select:focus,input[type="search"]:focus{border-color:var(--bata)}
+select{min-width:min(320px,100%)}
+
+/* === SECTION: PROFIL KANDIDAT ========================================= */
+.profil{display:grid; gap:20px; grid-template-columns:1fr; margin-bottom:24px}
+@media (min-width:820px){ .profil{grid-template-columns:300px 1fr} }
+.kartu-profil{
+  padding:20px; border-radius:var(--r-lg); background:linear-gradient(#FFFDF7,#F4ECD9);
+  border:1px solid rgba(139,46,32,.16); text-align:center;
+}
+.sosok-mini{
+  position:relative; height:190px; margin-bottom:12px;
+  display:flex; align-items:flex-end; justify-content:center;
+}
+.sosok-mini .piring{
+  position:absolute; left:50%; bottom:6px; transform:translateX(-50%);
+  width:170px; height:170px; border-radius:50%;
+  background:radial-gradient(circle,#DCC7A0 0%,rgba(220,199,160,.6) 52%,rgba(220,199,160,0) 72%);
+}
+.sosok-mini img{
+  position:relative; max-height:185px; object-fit:contain; object-position:bottom;
+  filter:drop-shadow(-3px -3px 2px rgba(201,162,39,.85)) drop-shadow(2px 4px 5px rgba(60,35,20,.3));
+  -webkit-mask-image:linear-gradient(#000 78%,transparent 99%); mask-image:linear-gradient(#000 78%,transparent 99%);
+}
+.sosok-mini .ini{
+  position:relative; width:88px; height:88px; border-radius:50%; align-self:center;
+  background:linear-gradient(150deg,#E8DCC4,#D3BF95); border:1px solid rgba(176,132,32,.5);
+  display:flex; align-items:center; justify-content:center; font:600 28px var(--ui); color:var(--bata-pekat);
+}
+.pil{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:12px;
+  background:rgba(201,162,39,.18); border:1px solid rgba(176,132,32,.35);
+  font:600 11px var(--ui); color:var(--emas-teks); margin:3px}
+
+.kosong{padding:26px; text-align:center; color:var(--tinta-samar); font-size:13px}
+.legenda{display:flex; gap:14px; flex-wrap:wrap; font:500 11px var(--ui); color:var(--tinta-lunak); margin-bottom:12px}
+.legenda span{display:flex; align-items:center; gap:6px}
+.legenda i{width:12px; height:12px; border-radius:3px; display:block}
+
+/* === SECTION: MUAT ==================================================== */
+#muat{display:none; align-items:center; gap:10px; padding:30px; color:var(--tinta-samar); font-size:13px}
+#muat.tampil{display:flex}
+#muat i{width:20px; height:20px; border-radius:50%; border:2px solid rgba(176,132,32,.4);
+  border-top-color:var(--bata); animation:putar .9s linear infinite; display:block}
+</style>
+</head>
+<body>
+
+<!-- === SECTION: GERBANG SANDI === -->
+<div id="gerbang">
+  <div class="kotak-sandi">
+    <div class="eyebrow">BPS KABUPATEN BULELENG</div>
+    <h1>Dashboard Hasil</h1>
+    <p>Halaman panitia. Masukkan sandi untuk membuka rekap Insan Statistik Teladan.</p>
+    <label class="sr" for="sandi">Sandi</label>
+    <input class="masukan" id="sandi" type="password" autocomplete="current-password" placeholder="Sandi panitia">
+    <div id="galatSandi" role="alert"></div>
+    <div style="margin-top:18px;display:flex;gap:10px">
+      <button class="btn btn-1" id="tblMasuk" style="flex:1">Buka dashboard</button>
+    </div>
+    <p style="margin-top:16px;font-size:11px;color:var(--tinta-samar)">
+      Sandi diperiksa di server. Data rekap tidak dikirim ke peramban sebelum sandi cocok.
+    </p>
+  </div>
+</div>
+
+<header class="bar">
+  <div class="merek">INSAN STATISTIK TELADAN · DASHBOARD</div>
+  <nav class="tab" id="tab" role="tablist">
+    <button role="tab" data-p="ringkas"     aria-selected="true">Ringkasan</button>
+    <button role="tab" data-p="peringkat"   aria-selected="false">Peringkat</button>
+    <button role="tab" data-p="kandidat"    aria-selected="false">Per kandidat</button>
+    <button role="tab" data-p="kelompok"    aria-selected="false">Per kelompok</button>
+    <button role="tab" data-p="indikator"   aria-selected="false">Per indikator</button>
+    <button role="tab" data-p="partisipasi" aria-selected="false">Partisipasi</button>
+  </nav>
+  <button class="btn btn-2" id="tblSegar" style="min-height:38px;padding:0 12px;font-size:12px">Segarkan</button>
+</header>
+
+<div id="muat"><i></i><span>Menghitung dari sheet vote…</span></div>
+
+<main>
+  <!-- RINGKASAN -->
+  <section class="panel aktif" id="p-ringkas">
+    <h2 class="judul">Ringkasan</h2>
+    <p class="sub" id="capWaktu">—</p>
+    <div class="angka" id="angkaRingkas"></div>
+    <h3 style="font-size:20px;margin-bottom:10px">Sepuluh besar</h3>
+    <div id="top10"></div>
+  </section>
+
+  <!-- PERINGKAT -->
+  <section class="panel" id="p-peringkat">
+    <h2 class="judul">Peringkat keseluruhan</h2>
+    <p class="sub">Klik judul kolom untuk mengurutkan. Poin: pilihan 1 = 3, pilihan 2 = 2, pilihan 3 = 1.</p>
+    <div class="kendali">
+      <input type="search" id="cariPeringkat" placeholder="Cari nama…">
+      <button class="btn btn-2" id="tblCsv">Unduh CSV</button>
+    </div>
+    <div class="bingkai-tabel"><table id="tblPeringkat">
+      <thead><tr>
+        <th class="kanan" data-urut="rank">#</th>
+        <th data-urut="nama">Nama</th>
+        <th class="kanan" data-urut="total">Total poin</th>
+        <th class="kanan" data-urut="suara">Suara</th>
+        <th class="kanan" data-urut="p1">Pilihan 1</th>
+        <th class="kanan" data-urut="p2">Pilihan 2</th>
+        <th class="kanan" data-urut="p3">Pilihan 3</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <!-- PER KANDIDAT -->
+  <section class="panel" id="p-kandidat">
+    <h2 class="judul">Telusuri per kandidat</h2>
+    <p class="sub">Kekuatan tiap orang berbeda-beda — lihat di kelompok mana ia paling dihormati.</p>
+    <div class="kendali">
+      <label class="sr" for="pilihKandidat">Pilih kandidat</label>
+      <select id="pilihKandidat"></select>
+    </div>
+    <div id="isiKandidat"></div>
+  </section>
+
+  <!-- PER KELOMPOK -->
+  <section class="panel" id="p-kelompok">
+    <h2 class="judul">Telusuri per kelompok</h2>
+    <p class="sub">Peringkat di dalam satu kelompok indikator.</p>
+    <div class="kendali">
+      <label class="sr" for="pilihKelompok">Pilih kelompok</label>
+      <select id="pilihKelompok"></select>
+    </div>
+    <div id="isiKelompok"></div>
+  </section>
+
+  <!-- PER INDIKATOR -->
+  <section class="panel" id="p-indikator">
+    <h2 class="judul">Telusuri per indikator</h2>
+    <p class="sub">Unit penilaian sesungguhnya. Tiap pemilih memberi 3 nama di setiap indikator.</p>
+    <div class="kendali">
+      <label class="sr" for="pilihIndikator">Pilih indikator</label>
+      <select id="pilihIndikator"></select>
+    </div>
+    <div id="isiIndikator"></div>
+  </section>
+
+  <!-- PARTISIPASI -->
+  <section class="panel" id="p-partisipasi">
+    <h2 class="judul">Partisipasi</h2>
+    <p class="sub">Hanya menampilkan sudah atau belum mengisi — bukan siapa memilih siapa.</p>
+    <div class="angka" id="angkaPartisipasi"></div>
+    <div class="bingkai-tabel"><table>
+      <thead><tr><th>Nama</th><th class="kanan">Indikator terisi</th><th>Status</th></tr></thead>
+      <tbody id="tbodyPartisipasi"></tbody>
+    </table></div>
+  </section>
+</main>
+
+<script>
+/* ======================================================================
+   === SECTION: KONFIGURASI ===
+   Ganti dengan URL /exec hasil deploy Apps Script (sama dengan index.html).
+   ====================================================================== */
+var API_URL = 'GANTI_DENGAN_URL_EXEC_APPS_SCRIPT';
+
+var D = null;          // data dashboard
+var SANDI = '';
+var urutKolom = 'total', urutNaik = false;
+
+/* === SECTION: UTILITAS === */
+function $(s, a){ return (a || document).querySelector(s); }
+function $$(s, a){ return Array.prototype.slice.call((a || document).querySelectorAll(s)); }
+function esc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function muat(on){ $('#muat').classList.toggle('tampil', !!on); }
+
+/** GET dengan cadangan JSONP bila CORS diblokir. */
+function apiGet(param){
+  var q = Object.keys(param).map(function(k){
+    return encodeURIComponent(k) + '=' + encodeURIComponent(param[k]);
+  }).join('&');
+  var url = API_URL + '?' + q;
+  return fetch(url, { method:'GET', redirect:'follow' })
+    .then(function(r){ return r.json(); })
+    .catch(function(){ return jsonp(url); });
+}
+function jsonp(url){
+  return new Promise(function(ok, no){
+    var nama = 'cb' + Date.now() + Math.floor(Math.random()*1e6);
+    var s = document.createElement('script');
+    var beres = function(){ delete window[nama]; if (s.parentNode) s.parentNode.removeChild(s); };
+    window[nama] = function(h){ beres(); ok(h); };
+    s.onerror = function(){ beres(); no(new Error('Tidak dapat menghubungi server.')); };
+    s.src = url + '&callback=' + nama;
+    document.head.appendChild(s);
+    setTimeout(function(){ if (window[nama]){ beres(); no(new Error('Server tidak menjawab.')); } }, 20000);
+  });
+}
+
+/* === SECTION: KOMPONEN === */
+function batang(nama, nilai, maks, kelas){
+  var lebar = maks > 0 ? (nilai / maks * 100) : 0;
+  return '<div class="batang-baris">' +
+    '<div class="batang-nama" title="' + esc(nama) + '">' + esc(nama) + '</div>' +
+    '<div class="batang-jalur"><div class="batang-isi ' + (kelas || '') + '" style="width:' + lebar.toFixed(1) + '%"></div></div>' +
+    '<div class="batang-nilai num">' + nilai + '</div>' +
+  '</div>';
+}
+function kartuAngka(label, nilai, kaki, sorot){
+  return '<div class="kartu' + (sorot ? ' sorot' : '') + '">' +
+    '<div class="label">' + esc(label) + '</div>' +
+    '<div class="nilai num">' + esc(nilai) + '</div>' +
+    (kaki ? '<div class="kaki">' + esc(kaki) + '</div>' : '') +
+  '</div>';
+}
+function petaKandidat(){
+  var m = {};
+  D.kandidat.forEach(function(k){ m[k.id] = k; });
+  return m;
+}
+
+/* === SECTION: RINGKASAN === */
+function gambarRingkas(){
+  var r = D.ringkas;
+  var persen = r.pemilihBerhak ? Math.round(r.pemilihTuntas / r.pemilihBerhak * 100) : 0;
+  $('#capWaktu').textContent = 'Dihitung ulang dari sheet vote pada ' +
+    new Date(D.dibuat).toLocaleString('id-ID') + '.';
+  $('#angkaRingkas').innerHTML =
+    kartuAngka('SUDAH MENGISI', r.pemilihTuntas + ' / ' + r.pemilihBerhak, persen + '% pegawai', true) +
+    kartuAngka('KANDIDAT', r.jumlahKandidat, 'bolehDipilih = TRUE') +
+    kartuAngka('INDIKATOR', r.totalIndikator, 'unit penilaian') +
+    kartuAngka('POIN BEREDAR', r.poinBeredar, 'dari maks ' + r.poinMaksTeoritis);
+
+  var top = D.kandidat.slice(0, 10);
+  var maks = top.length ? top[0].total : 0;
+  $('#top10').innerHTML = maks
+    ? top.map(function(k){ return batang(k.pendek, k.total, maks); }).join('')
+    : '<div class="kosong">Belum ada penilaian yang masuk.</div>';
+}
+
+/* === SECTION: PERINGKAT === */
+function gambarPeringkat(){
+  var q = ($('#cariPeringkat').value || '').trim().toLowerCase();
+  var baris = D.kandidat.slice();
+
+  baris.sort(function(a, b){
+    var x, y;
+    if (urutKolom === 'nama'){ x = a.nama.toLowerCase(); y = b.nama.toLowerCase(); }
+    else if (urutKolom === 'rank'){ x = a.total; y = b.total; return urutNaik ? x - y : y - x; }
+    else { x = a[urutKolom]; y = b[urutKolom]; }
+    if (x < y) return urutNaik ? -1 : 1;
+    if (x > y) return urutNaik ? 1 : -1;
+    return 0;
+  });
+
+  var peringkatAsli = {};
+  D.kandidat.forEach(function(k, i){ peringkatAsli[k.id] = i + 1; });
+
+  var tampil = baris.filter(function(k){ return !q || k.nama.toLowerCase().indexOf(q) >= 0; });
+  $('#tblPeringkat tbody').innerHTML = tampil.length ? tampil.map(function(k){
+    var r = peringkatAsli[k.id];
+    return '<tr class="' + (r <= 3 ? 'atas3' : '') + '">' +
+      '<td class="kanan"><span class="rank-sel num">' + r + '</span></td>' +
+      '<td>' + esc(k.pendek) + ' <span style="color:var(--tinta-samar);font-size:11px">' + esc(k.gelar) + '</span></td>' +
+      '<td class="kanan num"><b>' + k.total + '</b></td>' +
+      '<td class="kanan num">' + k.suara + '</td>' +
+      '<td class="kanan num">' + k.p1 + '</td>' +
+      '<td class="kanan num">' + k.p2 + '</td>' +
+      '<td class="kanan num">' + k.p3 + '</td>' +
+    '</tr>';
+  }).join('') : '<tr><td colspan="7" class="kosong">Tidak ada nama yang cocok.</td></tr>';
+}
+
+function unduhCsv(){
+  var kel = D.kelompok;
+  var kepala = ['peringkat','id','nama','total','suara','pilihan1','pilihan2','pilihan3']
+    .concat(kel.map(function(k){ return k.nama; }));
+  var baris = D.kandidat.map(function(k, i){
+    return [i + 1, k.id, k.nama, k.total, k.suara, k.p1, k.p2, k.p3]
+      .concat(kel.map(function(g){ return k.perKelompok[g.id] || 0; }));
+  });
+  var csv = [kepala].concat(baris).map(function(r){
+    return r.map(function(sel){
+      var s = String(sel == null ? '' : sel);
+      return /[",\n;]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+    }).join(';');
+  }).join('\r\n');
+
+  var blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rekap-insan-statistik-teladan.csv';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+
+/* === SECTION: PER KANDIDAT === */
+function isiPilihKandidat(){
+  $('#pilihKandidat').innerHTML = D.kandidat.map(function(k, i){
+    return '<option value="' + esc(k.id) + '">' + (i + 1) + '. ' + esc(k.pendek) +
+           ' — ' + k.total + ' poin</option>';
+  }).join('');
+}
+
+function gambarKandidat(){
+  var id = $('#pilihKandidat').value;
+  var k = petaKandidat()[id];
+  if (!k){ $('#isiKandidat').innerHTML = '<div class="kosong">Pilih satu kandidat.</div>'; return; }
+
+  var rank = D.kandidat.findIndex(function(x){ return x.id === id; }) + 1;
+  var wajah = k.foto
+    ? '<img src="' + esc(k.foto) + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">'
+    : '<span class="ini">' + esc(k.inisial) + '</span>';
+
+  // Per babak
+  var maksBabak = Math.max.apply(null, D.babak.map(function(b){ return k.perBabak[b.id] || 0; }).concat([1]));
+  var htmlBabak = D.babak.map(function(b){
+    return batang(b.nama, k.perBabak[b.id] || 0, maksBabak, 'lumut');
+  }).join('');
+
+  // Per kelompok
+  var maksKel = Math.max.apply(null, D.kelompok.map(function(g){ return k.perKelompok[g.id] || 0; }).concat([1]));
+  var htmlKel = D.kelompok.map(function(g){
+    return batang(g.nama, k.perKelompok[g.id] || 0, maksKel, 'emas');
+  }).join('');
+
+  // Indikator terkuat
+  var terkuat = D.indikator.map(function(ind){
+    return { nama: ind.indikatorNama, kel: ind.kelompokNama, poin: k.perIndikator[ind.indikatorId] || 0 };
+  }).sort(function(a, b){ return b.poin - a.poin; }).slice(0, 10);
+  var maksInd = terkuat.length ? Math.max(terkuat[0].poin, 1) : 1;
+
+  $('#isiKandidat').innerHTML =
+    '<div class="profil">' +
+      '<div class="kartu-profil">' +
+        '<div class="sosok-mini"><span class="piring"></span>' + wajah + '</div>' +
+        '<div style="font:600 17px var(--ui)">' + esc(k.pendek) + '</div>' +
+        '<div style="color:var(--tinta-samar);font-size:11.5px">' + esc(k.gelar || '—') + '</div>' +
+        '<div style="margin-top:12px">' +
+          '<span class="pil">Peringkat ' + rank + '</span>' +
+          '<span class="pil">' + k.total + ' poin</span>' +
+          '<span class="pil">' + k.suara + ' suara</span>' +
+        '</div>' +
+        '<div style="margin-top:10px;font:500 11.5px var(--ui);color:var(--tinta-lunak)">' +
+          'Pilihan 1: <b>' + k.p1 + '</b> · Pilihan 2: <b>' + k.p2 + '</b> · Pilihan 3: <b>' + k.p3 + '</b>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<h3 style="font-size:19px;margin-bottom:8px">Poin per babak</h3>' +
+        (k.total ? htmlBabak : '<div class="kosong">Belum menerima poin.</div>') +
+        '<h3 style="font-size:19px;margin:20px 0 8px">Poin per kelompok</h3>' +
+        (k.total ? htmlKel : '') +
+      '</div>' +
+    '</div>' +
+    '<h3 style="font-size:19px;margin-bottom:8px">Sepuluh indikator terkuat</h3>' +
+    (k.total
+      ? terkuat.map(function(t){ return batang(t.nama, t.poin, maksInd); }).join('')
+      : '<div class="kosong">Belum ada poin untuk ditampilkan.</div>');
+}
+
+/* === SECTION: PER KELOMPOK === */
+function isiPilihKelompok(){
+  $('#pilihKelompok').innerHTML = D.kelompok.map(function(g){
+    return '<option value="' + esc(g.id) + '">' + esc(g.babakNama) + ' — ' + esc(g.nama) +
+           ' (' + g.jumlah + ' indikator)</option>';
+  }).join('');
+}
+
+function gambarKelompok(){
+  var id = $('#pilihKelompok').value;
+  var g = D.kelompok.filter(function(x){ return x.id === id; })[0];
+  if (!g){ $('#isiKelompok').innerHTML = ''; return; }
+
+  var urut = D.kandidat.map(function(k){
+    return { nama: k.pendek, poin: k.perKelompok[id] || 0 };
+  }).sort(function(a, b){ return b.poin - a.poin || a.nama.localeCompare(b.nama); });
+  var maks = urut.length ? Math.max(urut[0].poin, 1) : 1;
+  var adaPoin = urut.some(function(x){ return x.poin > 0; });
+
+  var indKel = D.indikator.filter(function(i){ return i.kelompokId === id; });
+
+  $('#isiKelompok').innerHTML =
+    '<div class="angka">' +
+      kartuAngka('BABAK', g.babakNama, '') +
+      kartuAngka('INDIKATOR', g.jumlah, 'dalam kelompok ini') +
+      kartuAngka('POIN MAKS / ORANG', g.jumlah * 3 * D.ringkas.pemilihBerhak,
+                 'bila semua memilihnya di urutan 1') +
+    '</div>' +
+    '<h3 style="font-size:19px;margin-bottom:8px">Peringkat dalam “' + esc(g.nama) + '”</h3>' +
+    (adaPoin ? urut.map(function(x){ return batang(x.nama, x.poin, maks, 'emas'); }).join('')
+             : '<div class="kosong">Belum ada penilaian pada kelompok ini.</div>') +
+    '<h3 style="font-size:19px;margin:22px 0 8px">Indikator di dalamnya</h3>' +
+    '<div class="bingkai-tabel"><table><thead><tr><th>Indikator</th><th>Tiga besar</th></tr></thead><tbody>' +
+    indKel.map(function(ind){
+      var skor = D.skorIndikator[ind.indikatorId] || {};
+      var pk = petaKandidat();
+      var tiga = Object.keys(skor).map(function(pid){
+        return { nama: pk[pid] ? pk[pid].pendek : pid, poin: skor[pid] };
+      }).sort(function(a, b){ return b.poin - a.poin; }).slice(0, 3);
+      return '<tr><td>' + esc(ind.indikatorNama) + '</td><td>' +
+        (tiga.length ? tiga.map(function(t, i){
+          return '<span class="pil">' + (i + 1) + '. ' + esc(t.nama) + ' (' + t.poin + ')</span>';
+        }).join('') : '<span style="color:var(--tinta-samar)">—</span>') +
+      '</td></tr>';
+    }).join('') +
+    '</tbody></table></div>';
+}
+
+/* === SECTION: PER INDIKATOR === */
+function isiPilihIndikator(){
+  $('#pilihIndikator').innerHTML = D.indikator.map(function(ind, i){
+    return '<option value="' + esc(ind.indikatorId) + '">' + (i + 1) + '. ' +
+           esc(ind.kelompokNama) + ' — ' + esc(ind.indikatorNama) + '</option>';
+  }).join('');
+}
+
+function gambarIndikator(){
+  var id = $('#pilihIndikator').value;
+  var ind = D.indikator.filter(function(x){ return x.indikatorId === id; })[0];
+  if (!ind){ $('#isiIndikator').innerHTML = ''; return; }
+
+  var skor = D.skorIndikator[id] || {};
+  var pk = petaKandidat();
+  var urut = D.kandidat.map(function(k){
+    return { nama: k.pendek, poin: skor[k.id] || 0 };
+  }).sort(function(a, b){ return b.poin - a.poin || a.nama.localeCompare(b.nama); });
+  var maks = urut.length ? Math.max(urut[0].poin, 1) : 1;
+  var adaPoin = urut.some(function(x){ return x.poin > 0; });
+  var totalPoin = urut.reduce(function(a, x){ return a + x.poin; }, 0);
+
+  $('#isiIndikator').innerHTML =
+    '<div class="kartu" style="margin-bottom:18px">' +
+      '<div class="label">' + esc(ind.babakNama) + ' · ' + esc(ind.kelompokNama) + '</div>' +
+      '<div style="font:600 19px/1.35 var(--ui);margin-top:6px">' + esc(ind.indikatorNama) + '</div>' +
+      '<div style="font-size:12.5px;color:var(--tinta-lunak);margin-top:4px">' + esc(ind.deskripsi) + '</div>' +
+    '</div>' +
+    '<div class="angka">' +
+      kartuAngka('POIN TERKUMPUL', totalPoin, 'pada indikator ini') +
+      kartuAngka('PEMILIH MENGISI', Math.round(totalPoin / 6) + ' orang', '6 poin per pemilih') +
+    '</div>' +
+    '<h3 style="font-size:19px;margin-bottom:8px">Peringkat pada indikator ini</h3>' +
+    (adaPoin ? urut.map(function(x){ return batang(x.nama, x.poin, maks); }).join('')
+             : '<div class="kosong">Belum ada penilaian pada indikator ini.</div>');
+}
+
+/* === SECTION: PARTISIPASI === */
+function gambarPartisipasi(){
+  var tuntas = D.partisipasi.filter(function(x){ return x.tuntas; });
+  var belum = D.partisipasi.filter(function(x){ return !x.tuntas; });
+  $('#angkaPartisipasi').innerHTML =
+    kartuAngka('SUDAH MENGISI', tuntas.length, 'dari ' + D.partisipasi.length + ' pegawai', true) +
+    kartuAngka('BELUM MENGISI', belum.length, 'perlu diingatkan');
+
+  $('#tbodyPartisipasi').innerHTML = D.partisipasi.slice().sort(function(a, b){
+    return (b.tuntas - a.tuntas) || a.nama.localeCompare(b.nama);
+  }).map(function(x){
+    var status = x.tuntas
+      ? '<span class="pil" style="background:var(--bata);color:var(--gading);border-color:var(--bata)">SUDAH</span>'
+      : '<span class="pil">BELUM</span>';
+    return '<tr><td>' + esc(x.nama) + '</td>' +
+      '<td class="kanan num">' + x.jumlah + ' / ' + D.ringkas.totalIndikator + '</td>' +
+      '<td>' + status + '</td></tr>';
+  }).join('');
+}
+
+/* === SECTION: MUAT DATA === */
+function ambilData(){
+  muat(true);
+  return apiGet({ aksi:'dashboard', sandi: SANDI }).then(function(h){
+    muat(false);
+    if (!h || !h.ok) throw new Error((h && h.message) || 'Gagal memuat.');
+    D = h;
+    gambarRingkas();
+    isiPilihKandidat();  gambarKandidat();
+    isiPilihKelompok();  gambarKelompok();
+    isiPilihIndikator(); gambarIndikator();
+    gambarPeringkat();
+    gambarPartisipasi();
+  }).catch(function(e){
+    muat(false);
+    throw e;
+  });
+}
+
+function masuk(){
+  var s = $('#sandi').value.trim();
+  if (!s){ $('#galatSandi').textContent = 'Masukkan sandi.'; return; }
+  $('#tblMasuk').disabled = true;
+  $('#galatSandi').textContent = '';
+  SANDI = s;
+  ambilData().then(function(){
+    $('#tblMasuk').disabled = false;
+    try { sessionStorage.setItem('ist_sandi', s); } catch (e) {}
+    $('#gerbang').classList.add('pergi');
+  }).catch(function(e){
+    $('#tblMasuk').disabled = false;
+    SANDI = '';
+    $('#galatSandi').textContent = e && e.message ? e.message : 'Sandi salah.';
+    $('#sandi').select();
+  });
+}
+
+/* === SECTION: PASANG === */
+$('#tblMasuk').addEventListener('click', masuk);
+$('#sandi').addEventListener('keydown', function(e){ if (e.key === 'Enter') masuk(); });
+$('#tblSegar').addEventListener('click', function(){
+  if (SANDI) ambilData().catch(function(e){ alert(e.message); });
+});
+$('#tab').addEventListener('click', function(e){
+  var b = e.target.closest('button[data-p]');
+  if (!b) return;
+  $$('#tab button').forEach(function(x){ x.setAttribute('aria-selected', x === b ? 'true' : 'false'); });
+  $$('.panel').forEach(function(p){ p.classList.toggle('aktif', p.id === 'p-' + b.getAttribute('data-p')); });
+});
+$('#pilihKandidat').addEventListener('change', gambarKandidat);
+$('#pilihKelompok').addEventListener('change', gambarKelompok);
+$('#pilihIndikator').addEventListener('change', gambarIndikator);
+$('#cariPeringkat').addEventListener('input', gambarPeringkat);
+$('#tblCsv').addEventListener('click', unduhCsv);
+$$('#tblPeringkat th[data-urut]').forEach(function(th){
+  th.addEventListener('click', function(){
+    var k = th.getAttribute('data-urut');
+    if (urutKolom === k) urutNaik = !urutNaik; else { urutKolom = k; urutNaik = (k === 'nama'); }
+    gambarPeringkat();
+  });
+});
+
+// Sandi bertahan selama tab terbuka saja — tidak disimpan permanen.
+(function(){
+  if (API_URL.indexOf('GANTI_DENGAN') === 0){
+    $('#galatSandi').textContent = 'API_URL belum diisi di dashboard.html.';
+    return;
+  }
+  var s = '';
+  try { s = sessionStorage.getItem('ist_sandi') || ''; } catch (e) {}
+  if (!s) return;
+  SANDI = s;
+  ambilData().then(function(){ $('#gerbang').classList.add('pergi'); })
+             .catch(function(){ SANDI = ''; try { sessionStorage.removeItem('ist_sandi'); } catch (e) {} });
+})();
+</script>
+</body>
+</html>
