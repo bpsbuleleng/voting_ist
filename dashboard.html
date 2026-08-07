@@ -570,6 +570,17 @@ function gambarKandidat(){
   }).sort(function(a, b){ return b.poin - a.poin; }).slice(0, 10);
   var maksInd = terkuat.length ? Math.max(terkuat[0].poin, 1) : 1;
 
+  // Legenda warna dipisah SATU KALI di atas, bukan diulang di bawah tiap
+  // bilah — mengulang per-bilah membuat daftar 10 bilah jadi susah diamati
+  // (tiap bilah 2 baris, mata harus lompat naik-turun).
+  var kelDipakai = [], lihatKel = {};
+  terkuat.forEach(function(t){
+    if (!lihatKel[t.kelId]){ lihatKel[t.kelId] = true; kelDipakai.push(t); }
+  });
+  var htmlLegendaTerkuat = kelDipakai.map(function(t){
+    return '<span><i class="titik" style="background:' + warnaKelompok(t.kelId) + '"></i>' + esc(t.kel) + '</span>';
+  }).join('');
+
   $('#isiKandidat').innerHTML =
     '<div class="profil">' +
       '<div class="kartu-profil">' +
@@ -593,9 +604,10 @@ function gambarKandidat(){
       '</div>' +
     '</div>' +
     '<h3 style="font-size:19px;margin-bottom:8px">Sepuluh indikator terkuat</h3>' +
-    '<p class="sub" style="margin-bottom:10px">Warna bilah menandai kelompok (sub-nilai) asal indikator itu.</p>' +
+    '<p class="sub" style="margin-bottom:6px">Warna bilah menandai kelompok (sub-nilai) asal indikator itu.</p>' +
+    (k.total ? '<div class="legenda">' + htmlLegendaTerkuat + '</div>' : '') +
     (k.total
-      ? terkuat.map(function(t){ return batangWarna(t.nama, t.poin, maksInd, warnaKelompok(t.kelId), t.kel); }).join('')
+      ? terkuat.map(function(t){ return batangWarna(t.nama, t.poin, maksInd, warnaKelompok(t.kelId)); }).join('')
       : '<div class="kosong">Belum ada poin untuk ditampilkan.</div>');
 }
 
