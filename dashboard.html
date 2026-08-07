@@ -140,7 +140,8 @@ h2.judul{font-size:clamp(24px,3.6vw,38px); margin-bottom:4px}
 .batang-isi.emas{background:linear-gradient(90deg,var(--emas-garis),var(--emas))}
 .batang-isi.lumut{background:linear-gradient(90deg,var(--lumut),#5A7C67)}
 .batang-nilai{flex:none; width:64px; font:600 12px var(--ui); color:var(--bata)}
-@media (max-width:640px){ .batang-nama{width:104px; font-size:11px} .batang-nilai{width:52px} }
+.batang-nilai.rasio{width:auto; min-width:82px; white-space:nowrap}
+@media (max-width:640px){ .batang-nama{width:104px; font-size:11px} .batang-nilai{width:52px} .batang-nilai.rasio{min-width:70px; font-size:11px} }
 
 /* === SECTION: TABEL =================================================== */
 .bingkai-tabel{overflow-x:auto; border:1px solid rgba(139,46,32,.16); border-radius:var(--r-lg); background:var(--gading-terang)}
@@ -416,6 +417,23 @@ function batang(nama, nilai, maks, kelas){
     '<div class="batang-nilai num">' + nilai + '</div>' +
   '</div>';
 }
+/**
+ * Untuk membandingkan lintas babak/kelompok — jumlah indikatornya BEDA-BEDA
+ * (mis. Beauty cuma 4 indikator, Budaya Organisasi 32), jadi poin mentah
+ * tidak sebanding: poin kecil di Beauty bukan berarti tampil buruk, bisa jadi
+ * cuma karena skala maksimalnya memang kecil. Lebar bilah dipersen-kan
+ * terhadap maksimum TEORITIS (jumlah indikator x 3 x pemilih berhak), bukan
+ * terhadap bilah tertinggi dalam satu set — supaya lebar bilah benar-benar
+ * bisa dibandingkan antar babak/kelompok. Labelnya tetap "poin / maks".
+ */
+function batangProporsi(nama, nilai, maksTeoritis, kelas){
+  var persen = maksTeoritis > 0 ? Math.min(100, nilai / maksTeoritis * 100) : 0;
+  return '<div class="batang-baris">' +
+    '<div class="batang-nama" title="' + esc(nama) + '">' + esc(nama) + '</div>' +
+    '<div class="batang-jalur"><div class="batang-isi ' + (kelas || '') + '" style="width:' + persen.toFixed(1) + '%"></div></div>' +
+    '<div class="batang-nilai rasio num">' + nilai + ' / ' + maksTeoritis + '</div>' +
+  '</div>';
+}
 /** Sama seperti batang(), tapi warna bilah bebas (dipakai untuk kode warna kelompok)
     dan boleh menampilkan label kelompok kecil di bawahnya untuk konteks. */
 function batangWarna(nama, nilai, maks, warna, tag){
@@ -549,16 +567,19 @@ function gambarKandidat(){
     ? '<img src="' + esc(k.foto) + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">'
     : '<span class="ini">' + esc(k.inisial) + '</span>';
 
-  // Per babak
-  var maksBabak = Math.max.apply(null, D.babak.map(function(b){ return k.perBabak[b.id] || 0; }).concat([1]));
+  // Per babak — jumlah indikator tiap babak beda jauh (Beauty 4 vs Budaya
+  // Organisasi 32), jadi lebar bilah dipersen-kan ke maks TEORITIS babak itu
+  // sendiri (bukan ke babak tertinggi milik kandidat ini), supaya lebar
+  // bilah antar babak benar-benar sebanding. Lihat batangProporsi().
   var htmlBabak = D.babak.map(function(b){
-    return batang(b.nama, k.perBabak[b.id] || 0, maksBabak, 'lumut');
+    var maksTeoritis = b.jumlah * 3 * D.ringkas.pemilihBerhak;
+    return batangProporsi(b.nama, k.perBabak[b.id] || 0, maksTeoritis, 'lumut');
   }).join('');
 
-  // Per kelompok
-  var maksKel = Math.max.apply(null, D.kelompok.map(function(g){ return k.perKelompok[g.id] || 0; }).concat([1]));
+  // Per kelompok — jumlah indikator tiap kelompok juga beda (4–8), alasan sama.
   var htmlKel = D.kelompok.map(function(g){
-    return batang(g.nama, k.perKelompok[g.id] || 0, maksKel, 'emas');
+    var maksTeoritis = g.jumlah * 3 * D.ringkas.pemilihBerhak;
+    return batangProporsi(g.nama, k.perKelompok[g.id] || 0, maksTeoritis, 'emas');
   }).join('');
 
   // Indikator terkuat — pakai rincian (teks pertanyaan sesungguhnya), bukan
@@ -597,9 +618,11 @@ function gambarKandidat(){
         '</div>' +
       '</div>' +
       '<div>' +
-        '<h3 style="font-size:19px;margin-bottom:8px">Poin per babak</h3>' +
+        '<h3 style="font-size:19px;margin-bottom:4px">Poin per babak</h3>' +
+        '<p class="sub" style="margin-bottom:8px">Lebar bilah = persentase dari maks teoritis babak itu (jumlah indikatornya beda-beda), bukan dibandingkan antar babak secara mentah.</p>' +
         (k.total ? htmlBabak : '<div class="kosong">Belum menerima poin.</div>') +
-        '<h3 style="font-size:19px;margin:20px 0 8px">Poin per kelompok</h3>' +
+        '<h3 style="font-size:19px;margin:20px 0 4px">Poin per kelompok</h3>' +
+        '<p class="sub" style="margin-bottom:8px">Begitu juga di sini — tiap kelompok punya maks teoritisnya sendiri.</p>' +
         (k.total ? htmlKel : '') +
       '</div>' +
     '</div>' +
