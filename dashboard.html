@@ -350,6 +350,7 @@ select{min-width:min(320px,100%)}
   <section class="panel" id="p-akhir">
     <h2 class="judul">Rekap akhir</h2>
     <p class="sub">Gabungan data administratif sheet "Rekap" (diisi tangan oleh panitia) dengan poin Beauty &amp; Nilai SBO dari voting. Total akhir dihitung ulang dari komponen, bukan dibaca dari sheet.</p>
+    <div id="kotakPengumuman"></div>
     <div id="isiAkhir"></div>
   </section>
 </main>
@@ -395,6 +396,15 @@ function jsonp(url){
     document.head.appendChild(s);
     setTimeout(function(){ if (window[nama]){ beres(); no(new Error('Server tidak menjawab.')); } }, 20000);
   });
+}
+/** Tulis. Content-Type WAJIB text/plain agar tidak memicu preflight OPTIONS. */
+function apiPost(muatan){
+  return fetch(API_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify(muatan),
+    redirect:'follow'
+  }).then(function(r){ return r.json(); });
 }
 
 /* === SECTION: KOMPONEN === */
@@ -751,6 +761,63 @@ function gambarPartisipasi(){
   }).join('');
 }
 
+/* === SECTION: PENGUMUMAN PEMENANG =======================================
+   Sakelar admin: menampilkan foto besar pemenang di halaman utama (index.html)
+   TANPA menunggu semua pemilih tuntas — itu keputusan panitia, bukan sistem.
+   Pratinjau (D.pengumuman.pemenang) selalu dihitung ulang dari data terkini,
+   dipakai dashboard sendiri agar admin tahu siapa yang AKAN diumumkan sebelum
+   menekan tombol. */
+function gambarPengumuman(){
+  var P = D.pengumuman;
+  var kotak = $('#kotakPengumuman');
+  if (!P || !P.pemenang){
+    kotak.innerHTML = '<div class="kosong" style="margin-bottom:18px">Belum ada kandidat untuk diumumkan.</div>';
+    return;
+  }
+  var aktif = !!P.aktif;
+  var w = P.pemenang;
+  kotak.innerHTML =
+    '<div class="kartu" style="margin-bottom:20px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">' +
+      '<div>' +
+        '<div class="label">PENGUMUMAN DI HALAMAN UTAMA</div>' +
+        '<div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px">' +
+          '<span class="pil"' + (aktif ? ' style="background:var(--bata);color:var(--gading);border-color:var(--bata)"' : '') + '>' +
+            (aktif ? 'SEDANG DIUMUMKAN' : 'BELUM DIUMUMKAN') +
+          '</span>' +
+          '<span>' + (aktif ? 'Yang tampil ke semua orang: ' : 'Kalau ditekan sekarang, yang diumumkan: ') +
+            '<b>' + esc(w.pendek) + '</b>' +
+            '<span style="color:var(--tinta-samar)"> — ' +
+              (w.sumber === 'rekapAkhir' ? 'dari Rekap akhir' : 'dari peringkat voting (Rekap akhir belum siap)') +
+            '</span>' +
+          '</span>' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn ' + (aktif ? 'btn-2' : 'btn-1') + '" id="tblFinalisasi">' +
+        (aktif ? 'Batalkan pengumuman' : 'Umumkan pemenang sekarang') +
+      '</button>' +
+    '</div>';
+}
+
+function tekanFinalisasi(){
+  var aktif = !(D.pengumuman && D.pengumuman.aktif);
+  var w = D.pengumuman && D.pengumuman.pemenang;
+  var pesan = aktif
+    ? 'Umumkan "' + (w ? w.pendek : '—') + '" sebagai Insan Statistik Teladan di halaman utama? ' +
+      'Foto besarnya akan langsung terlihat oleh siapa pun yang membuka halaman voting.'
+    : 'Batalkan pengumuman? Halaman utama akan kembali normal.';
+  if (!confirm(pesan)) return;
+
+  var btn = $('#tblFinalisasi');
+  if (btn) btn.disabled = true;
+  apiPost({ aksi:'finalisasi', sandi:SANDI, aktif: aktif }).then(function(h){
+    if (!h || !h.ok) throw new Error((h && h.message) || 'Gagal mengubah status pengumuman.');
+    return ambilData();
+  }).catch(function(e){
+    alert(e && e.message ? e.message : 'Gagal mengubah status pengumuman.');
+    if (btn) btn.disabled = false;
+  });
+}
+
 /* === SECTION: REKAP AKHIR === */
 function gambarRekapAkhir(){
   var RA = D.rekapAkhir;
@@ -812,7 +879,13 @@ function ambilData(){
   muat(true);
   return apiGet({ aksi:'dashboard', sandi: SANDI }).then(function(h){
     muat(false);
-    if (!h || !h.ok) throw new Error((h && h.message) || 'Gagal memuat.');
+    if (!h || !h.ok) {
+      // terkunci = server tegas bilang sandi salah. Tanpa itu berarti gangguan
+      // sementara (jaringan/server) — jangan disamakan dengan sandi salah.
+      var err = new Error((h && h.message) || 'Gagal memuat.');
+      err.terkunci = !!(h && h.terkunci);
+      throw err;
+    }
     D = h;
     siapkanWarnaKelompok();
     gambarRingkas();
@@ -823,6 +896,7 @@ function ambilData(){
     gambarPeringkat();
     gambarPartisipasi();
     gambarRekapAkhir();
+    gambarPengumuman();
   }).catch(function(e){
     muat(false);
     throw e;
@@ -875,6 +949,9 @@ $('#daftarIndikator').addEventListener('click', function(e){
 });
 $('#cariPeringkat').addEventListener('input', gambarPeringkat);
 $('#tblCsv').addEventListener('click', unduhCsv);
+$('#kotakPengumuman').addEventListener('click', function(e){
+  if (e.target.closest('#tblFinalisasi')) tekanFinalisasi();
+});
 $$('#tblPeringkat th[data-urut]').forEach(function(th){
   th.addEventListener('click', function(){
     var k = th.getAttribute('data-urut');
@@ -884,6 +961,10 @@ $$('#tblPeringkat th[data-urut]').forEach(function(th){
 });
 
 // Sandi bertahan selama tab terbuka saja — tidak disimpan permanen.
+// PENTING: sandi tersimpan HANYA dihapus bila server tegas bilang salah
+// (terkunci). Gangguan jaringan/server sementara TIDAK boleh menghapusnya —
+// dulu kegagalan apa pun (mis. sekali gagal fetch saat reload) langsung
+// membuang sandi yang sebenarnya masih sah, memaksa admin mengetik ulang.
 (function(){
   if (API_URL.indexOf('GANTI_DENGAN') === 0){
     $('#galatSandi').textContent = 'API_URL belum diisi di dashboard.html.';
@@ -893,8 +974,18 @@ $$('#tblPeringkat th[data-urut]').forEach(function(th){
   try { s = sessionStorage.getItem('ist_sandi') || ''; } catch (e) {}
   if (!s) return;
   SANDI = s;
+  $('#sandi').value = s;   // supaya tombol "Buka dashboard" bisa dicoba ulang tanpa mengetik lagi
   ambilData().then(function(){ $('#gerbang').classList.add('pergi'); })
-             .catch(function(){ SANDI = ''; try { sessionStorage.removeItem('ist_sandi'); } catch (e) {} });
+             .catch(function(e){
+               if (e && e.terkunci){
+                 SANDI = '';
+                 try { sessionStorage.removeItem('ist_sandi'); } catch (err) {}
+                 $('#galatSandi').textContent = e.message || 'Sandi salah.';
+               } else {
+                 $('#galatSandi').textContent = (e && e.message ? e.message : 'Gagal memuat.')
+                   + ' Sandi tersimpan tetap dipakai — coba lagi.';
+               }
+             });
 })();
 </script>
 </body>

@@ -652,6 +652,31 @@ body.mode-app #film{display:none}
 #sinyal.tampil{opacity:1; transform:translate(-50%,0)}
 #sinyal.galat{background:var(--hancur)}
 
+/* === SECTION: PENGUMUMAN PEMENANG =======================================
+   Di atas SEGALANYA (termasuk #tirai z:90 dan #sinyal z:99) — tampil hanya
+   bila panitia menekan "Umumkan" di dashboard. Diperiksa lewat panggilan
+   terpisah dari muatMaster(), tidak saling menunggu/menghalangi: pengumuman
+   tetap tampil walau data voting biasa gagal dimuat, dan sebaliknya. */
+#pengumuman{
+  position:fixed; inset:0; z-index:100; display:none;
+  align-items:center; justify-content:center; padding:24px; overflow-y:auto;
+  background:radial-gradient(120% 70% at 50% 22%,#FFFBF0,var(--gading) 55%,var(--gading-teduh));
+}
+#pengumuman.tampil{display:flex}
+#pengumuman .isi{width:min(480px,100%); text-align:center; padding:26px 0 40px; margin:auto}
+#pengumuman .eyebrow{font:600 11px var(--ui); letter-spacing:.24em; color:var(--bata)}
+#pengumuman h1{
+  font-family:var(--display); font-weight:600; font-size:clamp(28px,5.6vw,46px);
+  margin:10px 0 4px; line-height:1.06;
+}
+#pengumuman h1 em{font-style:italic; color:var(--bata)}
+#pengumuman .podium-menang{ --s:190px; --dasar:46px; position:relative; height:270px; margin:20px auto 6px }
+@media (min-width:640px){ #pengumuman .podium-menang{ --s:230px; --dasar:56px; height:320px } }
+#pengumuman .nama{font:600 24px var(--ui); margin-top:6px}
+#pengumuman .gelar{font:400 13px var(--ui); color:var(--tinta-samar); margin-top:2px}
+#pengumuman .garis{width:52px; height:2px; background:var(--emas-garis); margin:18px auto}
+#pengumuman .lead{max-width:400px; margin:0 auto}
+
 /* Persembahan & sukses */
 #akhir{position:relative; z-index:10; display:none}
 body.mode-akhir #akhir{display:block}
@@ -672,6 +697,26 @@ body.mode-akhir #film{display:none}
 </style>
 </head>
 <body>
+
+<!-- ======================================================================
+     === SECTION: PENGUMUMAN PEMENANG ===
+     Diperiksa terpisah dari data voting; tampil hanya bila panitia
+     mengaktifkannya lewat dashboard. Tidak memblokir/mensyaratkan voting.
+     ====================================================================== -->
+<div id="pengumuman" role="dialog" aria-modal="true" aria-labelledby="pengumumanJudul">
+  <div class="isi">
+    <div class="eyebrow">BPS KABUPATEN BULELENG</div>
+    <h1 id="pengumumanJudul">Insan Statistik<br><em>Teladan</em></h1>
+    <div class="podium-menang" id="podiumMenang"></div>
+    <div class="nama" id="pengumumanNama">—</div>
+    <div class="gelar" id="pengumumanGelar"></div>
+    <div class="garis"></div>
+    <p class="lead">Sebuah penghormatan dari rekan untuk rekan.</p>
+    <div style="margin-top:26px">
+      <button class="btn btn-1 btn-pill" id="tblTutupPengumuman">Lanjutkan</button>
+    </div>
+  </div>
+</div>
 
 <!-- ======================================================================
      === SECTION: MARKUP ===
@@ -1980,6 +2025,10 @@ document.addEventListener('visibilitychange', function(){
    ====================================================================== */
 function pasangPenangan(){
   $('#tblRingan').addEventListener('click', function(){ setRingan(!S.ringan, true); });
+  $('#tblTutupPengumuman').addEventListener('click', function(){
+    $('#pengumuman').classList.remove('tampil');
+    document.documentElement.classList.remove('kunci-gulir');
+  });
 
   $('#tblMulai').addEventListener('click', function(){ keFilm('#s-identitas'); });
   $('#tblKeIdentitas').addEventListener('click', function(){ keFilm('#s-identitas'); });
@@ -2108,10 +2157,29 @@ function muatMaster(){
   });
 }
 
+/**
+ * Independen dari muatMaster() — sengaja tidak saling menunggu. Pengumuman
+ * harus tetap tampil walau data voting gagal dimuat (dan sebaliknya).
+ * Kegagalan di sini didiamkan: jangan sampai halaman voting terganggu hanya
+ * karena pengecekan pengumuman gagal.
+ */
+function periksaPengumuman(){
+  return apiGet('pengumuman').then(function(h){
+    if (!h || !h.aktif || !h.pemenang) return;
+    var p = h.pemenang;
+    $('#podiumMenang').innerHTML = htmlSosok(p);
+    $('#pengumumanNama').textContent = p.pendek || p.nama || '';
+    $('#pengumumanGelar').textContent = p.gelar || '';
+    $('#pengumuman').classList.add('tampil');
+    document.documentElement.classList.add('kunci-gulir');
+  }).catch(function(){ /* diam */ });
+}
+
 function mulai(){
   setRingan(deteksiRingan(), false);
   pasangPenangan();
   majuTirai(25);
+  periksaPengumuman();
 
   if (API_URL.indexOf('GANTI_DENGAN') === 0){
     majuTirai(100, '');

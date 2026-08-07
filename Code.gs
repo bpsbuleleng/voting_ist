@@ -68,6 +68,20 @@ function sandiAdmin_() {
   return PropertiesService.getScriptProperties().getProperty('SANDI_ADMIN') || 'admin5108';
 }
 
+/**
+ * Pengumuman pemenang di halaman utama (index.html) — dipicu TANGAN oleh
+ * panitia lewat dashboard, bukan otomatis. Disimpan sebagai Script Property
+ * supaya bertahan lintas permintaan tanpa sheet tambahan. Sengaja LEPAS dari
+ * kelengkapan partisipasi — panitia boleh mengumumkan walau belum semua orang
+ * mengisi; itu keputusan panitia, bukan sistem.
+ */
+function pengumumanAktif_() {
+  return PropertiesService.getScriptProperties().getProperty('PENGUMUMAN_AKTIF') === 'true';
+}
+function setPengumumanAktif_(aktif) {
+  PropertiesService.getScriptProperties().setProperty('PENGUMUMAN_AKTIF', aktif ? 'true' : 'false');
+}
+
 
 // === SECTION: ROUTER HTTP ===============================================
 
@@ -90,12 +104,13 @@ function doGet(e) {
   const cb = p.callback;
   try {
     switch (p.aksi) {
-      case 'master':    return json_(getMasterData(), cb);
-      case 'dashboard': return json_(getDashboard(p.sandi), cb);
-      case 'cekSandi':  return json_({ ok: teks_(p.sandi) === sandiAdmin_() }, cb);
+      case 'master':      return json_(getMasterData(), cb);
+      case 'dashboard':   return json_(getDashboard(p.sandi), cb);
+      case 'cekSandi':    return json_({ ok: teks_(p.sandi) === sandiAdmin_() }, cb);
+      case 'pengumuman':  return json_(getPengumuman_(), cb);
       default:
         return json_({ ok: true, layanan: 'Insan Statistik Teladan API',
-                       aksi: ['master', 'dashboard', 'cekSandi'] }, cb);
+                       aksi: ['master', 'dashboard', 'cekSandi', 'pengumuman'] }, cb);
     }
   } catch (err) {
     return json_({ ok: false, message: String(err && err.message ? err.message : err) }, cb);
@@ -111,6 +126,7 @@ function doPost(e) {
     const isi = (e && e.postData && e.postData.contents) || '{}';
     const p = JSON.parse(isi);
     if (p.aksi === 'vote') return json_(submitVote(p));
+    if (p.aksi === 'finalisasi') return json_(setFinalisasi_(p));
     return json_({ ok: false, message: 'Aksi tidak dikenali.' });
   } catch (err) {
     return json_({ ok: false, message: String(err && err.message ? err.message : err) });
@@ -754,7 +770,69 @@ function hitungRekap_(master) {
     R.rekapAkhir = { ok: false, message: 'Gagal menghitung rekap akhir: ' + String(e && e.message ? e.message : e) };
   }
 
+  // Status pengumuman + pratinjau siapa yang AKAN diumumkan bila panitia
+  // menekan tombol — dihitung dari R yang sama, tidak perlu baca ulang sheet.
+  try {
+    R.pengumuman = { aktif: pengumumanAktif_(), pemenang: hitungPemenang_(R) };
+  } catch (e) {
+    R.pengumuman = { aktif: false, pemenang: null };
+  }
+
   return R;
+}
+
+
+// === SECTION: API — pengumuman ==========================================
+
+/**
+ * Pemenang = baris teratas "Rekap akhir" (admin + Beauty + Nilai SBO) bila
+ * sheet "Rekap" sudah siap; jatuh ke peringkat poin voting biasa bila belum.
+ * Dihitung ulang dari data terkini setiap kali dipanggil — TIDAK disimpan
+ * sebagai snapshot — supaya kalau panitia memperbaiki sesuatu di sheet
+ * setelah mengumumkan, pengumuman ikut benar tanpa perlu menekan ulang.
+ */
+function hitungPemenang_(R) {
+  if (!R.kandidat.length) return null;
+
+  let terpilih = R.kandidat[0], sumber = 'voting';
+  if (R.rekapAkhir && R.rekapAkhir.ok && R.rekapAkhir.kandidat.length) {
+    const teratas = R.rekapAkhir.kandidat[0];
+    const cocok = R.kandidat.filter(function (k) { return k.id === teratas.id; })[0];
+    if (cocok) { terpilih = cocok; sumber = 'rekapAkhir'; }
+  }
+
+  return { id: terpilih.id, nama: terpilih.nama, pendek: terpilih.pendek,
+           gelar: terpilih.gelar, inisial: terpilih.inisial, foto: terpilih.foto,
+           sumber: sumber };
+}
+
+/**
+ * PUBLIK — dipanggil dari index.html oleh siapa pun, tanpa sandi. Hanya
+ * membocorkan identitas SATU pemenang saat panitia mengaktifkannya, TIDAK
+ * PERNAH poin/peringkat/data pemilih. Bila belum aktif, cek murah (Script
+ * Property) — tidak menyentuh sheet sama sekali, supaya pemuatan halaman
+ * voting biasa tidak ikut menanggung biaya menghitung ulang rekap tiap kali.
+ */
+function getPengumuman_() {
+  if (!pengumumanAktif_()) return { ok: true, aktif: false };
+  try {
+    const menang = hitungPemenang_(hitungRekap_(bacaMaster_()));
+    if (!menang) return { ok: true, aktif: false };
+    return { ok: true, aktif: true, pemenang: menang };
+  } catch (e) {
+    // Jangan sampai halaman voting error karena pengumuman gagal dihitung.
+    return { ok: true, aktif: false };
+  }
+}
+
+/** ADMIN — sakelar tampil/sembunyikan pengumuman. Digerbang sandi di server. */
+function setFinalisasi_(p) {
+  if (teks_(p.sandi) !== sandiAdmin_()) {
+    return { ok: false, message: 'Sandi salah.' };
+  }
+  const aktif = !!p.aktif;
+  setPengumumanAktif_(aktif);
+  return { ok: true, aktif: aktif };
 }
 
 
